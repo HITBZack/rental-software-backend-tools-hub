@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
         <Button
           variant="ghost"
           onClick={() => router.back()}
-          className="mb-8 gap-2 text-muted-foreground hover:text-foreground"
+          className="mb-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-pastel-mint/30"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Go Back
@@ -92,7 +92,10 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-xl font-semibold text-foreground mb-4">Contact Us</h2>
             <p className="text-muted-foreground leading-relaxed">
               If you have any questions about this Privacy Policy, please contact us at{" "}
-              <a href="mailto:contact@halfinthebox.com" className="text-primary hover:underline">
+              <a
+                href="mailto:contact@halfinthebox.com"
+                className="text-foreground font-medium hover:text-pastel-mint transition-colors"
+              >
                 contact@halfinthebox.com
               </a>
               .

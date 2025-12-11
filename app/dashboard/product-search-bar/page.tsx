@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -19,7 +19,7 @@ import {
   CloudUploadIcon,
   ShieldIcon,
 } from "@/components/icons"
-import { getSettings } from "@/lib/storage"
+import { getSettings, saveSettings } from "@/lib/storage"
 
 interface Product {
   name: string
@@ -50,6 +50,23 @@ export default function ProductSearchBarPage() {
   const [stopwords, setStopwords] = useState(DEFAULT_STOPWORDS)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(0)
+
+  useEffect(() => {
+    const settings = getSettings()
+    if (settings.customStopwords) {
+      setStopwords(settings.customStopwords)
+    }
+  }, [])
+
+  const handleStopwordsChange = (value: string) => {
+    setStopwords(value)
+    saveSettings({ customStopwords: value })
+  }
+
+  const handleResetStopwords = () => {
+    setStopwords(DEFAULT_STOPWORDS)
+    saveSettings({ customStopwords: null })
+  }
 
   // Pluralize helper
   const pluralize = (word: string): string => {
@@ -314,7 +331,7 @@ export default function ProductSearchBarPage() {
                   </CardTitle>
                   <CardDescription>
                     Stopwords are common words that are excluded from search tags. You can customize this list to
-                    include/exclude words specific to your business.
+                    include/exclude words specific to your business. Your changes are saved automatically.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -323,21 +340,16 @@ export default function ProductSearchBarPage() {
                     <Textarea
                       id="stopwords"
                       value={stopwords}
-                      onChange={(e) => setStopwords(e.target.value)}
+                      onChange={(e) => handleStopwordsChange(e.target.value)}
                       className="mt-2 h-32 font-mono text-xs"
                       placeholder="Enter comma-separated words to exclude from tags..."
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       These words will be excluded from generated search tags. Add words that are too common or not
-                      useful for searching your products.
+                      useful for searching your products. Your stopwords are saved automatically.
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setStopwords(DEFAULT_STOPWORDS)}
-                    className="text-xs"
-                  >
+                  <Button variant="outline" size="sm" onClick={handleResetStopwords} className="text-xs bg-transparent">
                     Reset to Defaults
                   </Button>
                 </CardContent>

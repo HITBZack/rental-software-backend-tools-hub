@@ -42,7 +42,7 @@ export function WaveMarquee({ text, variant = "lavender", speed = 45 }: WaveMarq
   const animationRef = useRef<number>()
 
   const separator = "   •   "
-  const repeatedText = `${text}${separator}`.repeat(8)
+  const repeatedText = `${text}${separator}`.repeat(16)
 
   const instanceId = useRef(`wave-${Math.random().toString(36).substr(2, 9)}`).current
   const textPathId = `textPath-${instanceId}`
@@ -72,19 +72,21 @@ export function WaveMarquee({ text, variant = "lavender", speed = 45 }: WaveMarq
   }, [speed])
 
   return (
-    <div className="w-full relative" style={{ height: "160px", marginTop: "-30px" }}>
-      <svg className="w-full h-full" viewBox="0 0 1600 160" preserveAspectRatio="none" style={{ overflow: "visible" }}>
+    <div className="w-full relative" style={{ height: "120px", marginTop: "-20px" }}>
+      <svg className="w-full h-full" viewBox="0 0 1600 120" preserveAspectRatio="none" style={{ overflow: "visible" }}>
         <defs>
           <path
             id={textPathId}
             d="
-              M-800 105
-              C-600 75, -400 135, -200 105
-              C0 75, 200 135, 400 105
-              C600 75, 800 135, 1000 105
-              C1200 75, 1400 135, 1600 105
-              C1800 75, 2000 135, 2200 105
-              C2400 75, 2600 135, 2800 105
+              M-1600 68
+              C-1400 38, -1200 98, -1000 68
+              C-800 38, -600 98, -400 68
+              C-200 38, 0 98, 200 68
+              C400 38, 600 98, 800 68
+              C1000 38, 1200 98, 1400 68
+              C1600 38, 1800 98, 2000 68
+              C2200 38, 2400 98, 2600 68
+              C2800 38, 3000 98, 3200 68
             "
             fill="none"
           />
@@ -92,12 +94,14 @@ export function WaveMarquee({ text, variant = "lavender", speed = 45 }: WaveMarq
 
         <path
           d="
-            M0 50
-            C100 20, 200 80, 400 45
-            C600 10, 800 70, 1000 40
-            C1200 10, 1400 65, 1600 35
-            L1600 160
-            L0 160
+            M0 30
+            C100 5, 200 55, 400 25
+            C600 -5, 800 45, 1000 20
+            C1200 -5, 1400 40, 1600 15
+            L1600 90
+            C1400 115, 1200 65, 1000 95
+            C800 125, 600 75, 400 100
+            C200 130, 100 80, 0 105
             Z
           "
           fill={colors.fill}
@@ -105,9 +109,9 @@ export function WaveMarquee({ text, variant = "lavender", speed = 45 }: WaveMarq
 
         <text
           fill={colors.text}
-          fontSize="28"
+          fontSize="48"
           fontWeight="500"
-          letterSpacing="0.12em"
+          letterSpacing="0.08em"
           fontFamily="Georgia, 'Times New Roman', serif"
           fontStyle="italic"
         >
@@ -118,10 +122,10 @@ export function WaveMarquee({ text, variant = "lavender", speed = 45 }: WaveMarq
 
         <path
           d="
-            M0 50
-            C100 20, 200 80, 400 45
-            C600 10, 800 70, 1000 40
-            C1200 10, 1400 65, 1600 35
+            M0 30
+            C100 5, 200 55, 400 25
+            C600 -5, 800 45, 1000 20
+            C1200 -5, 1400 40, 1600 15
           "
           fill="none"
           stroke="white"

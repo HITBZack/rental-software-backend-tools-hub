@@ -6,7 +6,15 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
-import { LayoutIcon, ChartBarIcon, MagnifyingGlassIcon, WordPressIcon, GearIcon, LockIcon } from "@/components/icons"
+import {
+  LayoutIcon,
+  ChartBarIcon,
+  MagnifyingGlassIcon,
+  WordPressIcon,
+  GearIcon,
+  LockIcon,
+  ClipboardListIcon,
+} from "@/components/icons"
 
 interface Tool {
   name: string
@@ -39,11 +47,18 @@ const tools: Tool[] = [
     available: true,
   },
   {
+    name: "Order Picking Helper",
+    href: "/dashboard/order-picking",
+    icon: <ClipboardListIcon className="h-5 w-5" />,
+    description: "Track outgoing deliveries",
+    available: true,
+  },
+  {
     name: "WordPress Plugin",
     href: "/dashboard/wordpress-plugin",
     icon: <WordPressIcon className="h-5 w-5" />,
     description: "UI customization plugin",
-    available: true,
+    available: false,
   },
   {
     name: "Settings",

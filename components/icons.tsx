@@ -460,22 +460,8 @@ export function InventoryBoxIcon({ className }: { className?: string }) {
 
 export function WordPressIcon({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="10" />
-      <path d="M3.5 12C3.5 12 6 19 12 19" />
-      <path d="M12 19C18 19 20.5 12 20.5 12" />
-      <path d="M8 8L12 19L14 13" />
-      <path d="M14 13L16 8" />
-      <path d="M5 8H7" />
-      <path d="M17 8H19" />
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 2C6.486 2 2 6.486 2 12s4.486 10 10 10 10-4.486 10-10S17.514 2 12 2zm-1.508 15.09L7.02 8.56c.292-.014.557-.036.557-.036.262-.03.231-.414-.031-.4 0 0-.79.062-1.3.062-.091 0-.199-.003-.313-.007A7.96 7.96 0 0 1 12 4c2.137 0 4.083.842 5.521 2.212-.035-.003-.069-.01-.106-.01-.48 0-.82.418-.82.868 0 .4.232.74.48 1.14.186.323.4.738.4 1.338 0 .415-.16.896-.372 1.568l-.489 1.633-1.77-5.268c.292-.014.557-.036.557-.036.261-.03.23-.414-.031-.4 0 0-.79.062-1.3.062-.092 0-.2-.002-.314-.006a7.979 7.979 0 0 0-1.248-.1c-.097 0-.192.006-.288.01l2.19 6.336-1.082 3.24zm7.076-3.342A7.962 7.962 0 0 0 20 12c0-1.652-.503-3.186-1.364-4.46.061.375.096.76.096 1.158 0 1.143-.213 2.428-.854 4.037l-3.41 9.857zm-7.792 4.508l2.882-8.375.011-.027c.104-.255.18-.478.232-.672l.015.046 2.055 5.627.067.183a8.01 8.01 0 0 1-5.262 3.218zM4 12c0-1.47.397-2.848 1.088-4.033l3 8.222.117.32A7.963 7.963 0 0 1 4 12z" />
     </svg>
   )
 }
@@ -693,6 +679,120 @@ export function ArrowLeftIcon({ className }: { className?: string }) {
     >
       <path d="M19 12H5" />
       <path d="M12 19L5 12L12 5" />
+    </svg>
+  )
+}
+
+export function CookieIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="8" cy="9" r="1" fill="currentColor" />
+      <circle cx="15" cy="8" r="1" fill="currentColor" />
+      <circle cx="10" cy="14" r="1" fill="currentColor" />
+      <circle cx="16" cy="14" r="1" fill="currentColor" />
+      <circle cx="12" cy="11" r="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+export function XIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M18 6L6 18" />
+      <path d="M6 6L18 18" />
+    </svg>
+  )
+}
+
+// New icons for Order Picking Helper
+export function ClipboardListIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M16 4H18C18.5 4 19 4.5 19 5V21C19 21.5 18.5 22 18 22H6C5.5 22 5 21.5 5 21V5C5 4.5 5.5 4 6 4H8" />
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M9 12H15" />
+      <path d="M9 16H15" />
+      <path d="M9 8H10" />
+    </svg>
+  )
+}
+
+export function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2V6" />
+      <path d="M8 2V6" />
+      <path d="M3 10H21" />
+    </svg>
+  )
+}
+
+export function PackageIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M16.5 9.4L7.5 4.21" />
+      <path d="M21 16V8C21 7.5 20.7 7 20.3 6.7L12.3 2.2C12.1 2.1 11.9 2.1 11.7 2.2L3.7 6.7C3.3 7 3 7.5 3 8V16C3 16.5 3.3 17 3.7 17.3L11.7 21.8C11.9 21.9 12.1 21.9 12.3 21.8L20.3 17.3C20.7 17 21 16.5 21 16Z" />
+      <path d="M3.3 7L12 12L20.7 7" />
+      <path d="M12 22V12" />
+    </svg>
+  )
+}
+
+export function CheckSquareIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 12L11 14L15 10" />
     </svg>
   )
 }

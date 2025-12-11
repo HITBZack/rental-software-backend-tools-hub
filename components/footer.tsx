@@ -71,7 +71,7 @@ export function Footer() {
           </div>
 
           <p className="text-xs text-muted-foreground text-center md:text-right">
-            Not affiliated with or endorsed by Booqable. Booqable is a trademark of Booqable BV.
+            Not affiliated with or endorsed by Booqable.
           </p>
         </div>
       </div>

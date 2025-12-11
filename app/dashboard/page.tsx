@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Footer } from "@/components/footer"
-import { ChartBarIcon, MagnifyingGlassIcon, WordPressIcon, ArrowRightIcon } from "@/components/icons"
+import { ChartBarIcon, MagnifyingGlassIcon, WordPressIcon, ArrowRightIcon, ClipboardListIcon } from "@/components/icons"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -28,12 +28,21 @@ const tools = [
     color: "bg-pastel-mint",
   },
   {
+    name: "Order Picking Helper",
+    description:
+      "Track which items are going out for delivery within a date range. Combines orders and shows quantities at a glance.",
+    icon: ClipboardListIcon,
+    href: "/dashboard/order-picking",
+    available: true,
+    color: "bg-pastel-blue",
+  },
+  {
     name: "WordPress Plugin",
     description:
       "Download our WordPress plugin to customize Booqable UI elements like product displays, lightboxes, and cart popups.",
     icon: WordPressIcon,
     href: "/dashboard/wordpress-plugin",
-    available: true,
+    available: false,
     color: "bg-pastel-peach",
   },
 ]
@@ -108,7 +117,7 @@ export default function DashboardPage() {
       </div>
 
       <WaveMarquee
-        text="more tools coming soon • automated reminders • custom emails • checkout scripts • and more"
+        text="more tools coming soon • automated reminders • custom emails • checkout scripts"
         variant="peach"
         speed={30}
       />

@@ -10,6 +10,8 @@ export interface PlatformSettings {
   hasCompletedReferralOnboarding: boolean
   referralTooltipMessage: string
   referralSetupMode: "existing" | "auto" | null
+  customStopwords: string | null
+  hasAcceptedLocalStorage: boolean
 }
 
 const STORAGE_KEY = "booqable-helper-settings"
@@ -23,6 +25,8 @@ const defaultSettings: PlatformSettings = {
   hasCompletedReferralOnboarding: false,
   referralTooltipMessage: "Please let us know how you found out about us, we would love to know!",
   referralSetupMode: null,
+  customStopwords: null,
+  hasAcceptedLocalStorage: false,
 }
 
 export function getSettings(): PlatformSettings {
