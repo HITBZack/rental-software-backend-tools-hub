@@ -19,6 +19,7 @@ import {
   CloudUploadIcon,
   ShieldIcon,
 } from "@/components/icons"
+import { getAllPaginated } from "@/lib/api"
 import { getSettings, saveSettings } from "@/lib/storage"
 
 interface Product {
@@ -129,71 +130,55 @@ export default function ProductSearchBarPage() {
 
     const settings = getSettings()
     const apiKey = settings.apiKey
+    const businessSlug = settings.businessSlug
 
-    if (!apiKey) {
-      setError("No API key configured. Please complete onboarding first.")
+    if (!apiKey || !businessSlug) {
+      setError("Missing Booqable connection details. Please complete onboarding first.")
       setStep("intro")
       return
     }
 
-    const allProducts: Product[] = []
-    let page = 1
-    const pageSize = 100
-    let hasMore = true
-
     try {
-      while (hasMore) {
-        setCurrentPage(page)
+      const rawProducts = await getAllPaginated<any>("products", {
+        pageSize: 100,
+        sleepDelay: 500,
+        paginationMode: "legacy",
+        onProgress: (fetched, total) => {
+          setFetchedCount(fetched)
+          if (total && !totalCount) setTotalCount(total)
+          setFetchProgress(total ? Math.round((fetched / total) * 100) : 0)
+          setCurrentPage(Math.max(1, Math.ceil(fetched / 100)))
+        },
+      })
 
-        const response = await fetch(`https://api.booqable.com/1/products?page=${page}&per=${pageSize}`, {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
+      const mapped: Product[] = []
+      for (const p of rawProducts) {
+        const nameValue = (p?.name ?? p?.attributes?.name ?? "") as string
+        const name = nameValue.toLowerCase()
+        if (name.includes("delivery") || name.includes("pick up")) continue
+
+        const id = (p?.id ?? p?.attributes?.id) as string
+        const slug = (p?.slug ?? p?.attributes?.slug) as string | undefined
+        const photoUrl = (p?.photo_url ?? p?.attributes?.photo_url) as string | null | undefined
+        const tagList = (p?.tag_list ?? p?.attributes?.tag_list) as string[] | undefined
+        const description = (p?.description ?? p?.attributes?.description) as string | null | undefined
+
+        if (!id || !nameValue) continue
+
+        mapped.push({
+          name: nameValue,
+          id,
+          url: `https://${businessSlug}.booqable.com/rentals/${slug || id}`,
+          image: photoUrl || null,
+          tags: tagList || [],
+          description: description || null,
         })
-
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`)
-        }
-
-        const data = await response.json()
-        const items = data.data || []
-
-        if (data.meta?.total && !totalCount) {
-          setTotalCount(data.meta.total)
-        }
-
-        for (const p of items) {
-          const name = (p.name || "").toLowerCase()
-          // Skip delivery/pickup items
-          if (name.includes("delivery") || name.includes("pick up")) continue
-
-          allProducts.push({
-            name: p.name,
-            id: p.id,
-            url: `https://${settings.companySlug || "your-company"}.booqable.com/rentals/${p.slug || p.id}`,
-            image: p.photo_url || null,
-            tags: p.tag_list || [],
-            description: p.description || null,
-          })
-        }
-
-        setProducts([...allProducts])
-        setFetchedCount(allProducts.length)
-        setFetchProgress(totalCount ? Math.round((allProducts.length / totalCount) * 100) : (page * 10) % 100)
-
-        if (items.length < pageSize) {
-          hasMore = false
-        } else {
-          page++
-          // Rate limiting delay
-          await new Promise((r) => setTimeout(r, 500))
-        }
       }
 
+      setProducts(mapped)
+      setFetchedCount(mapped.length)
       setFetchProgress(100)
-      // Auto-proceed to tagging
-      setTimeout(() => generateTagsForProducts(allProducts), 500)
+      setTimeout(() => generateTagsForProducts(mapped), 500)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch products")
       setStep("intro")

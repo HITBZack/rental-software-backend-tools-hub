@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 
 interface WaveMarqueeProps {
   text: string
@@ -39,13 +39,34 @@ const colorMap = {
 export function WaveMarquee({ text, variant = "lavender", speed = 45 }: WaveMarqueeProps) {
   const colors = colorMap[variant]
   const [offset, setOffset] = useState(0)
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | null>(null)
 
   const separator = "   •   "
   const repeatedText = `${text}${separator}`.repeat(16)
 
-  const instanceId = useRef(`wave-${Math.random().toString(36).substr(2, 9)}`).current
-  const textPathId = `textPath-${instanceId}`
+  const reactId = useId()
+  const safeId = reactId.replace(/[^a-zA-Z0-9_-]/g, "")
+  const textPathId = `textPath-wave-${safeId || "default"}`
+
+  const textYOffset = 40
+
+  const topWavePath = `
+    M0 35
+    C112.5 15, 225 55, 450 35
+    C562.5 15, 675 55, 900 35
+    C1012.5 15, 1125 55, 1350 35
+    C1462.5 15, 1575 55, 1800 35
+  `
+
+  const fillWavePath = `
+    ${topWavePath}
+    L1800 95
+    C1687.5 115, 1575 75, 1350 95
+    C1237.5 115, 1125 75, 900 95
+    C787.5 115, 675 75, 450 95
+    C337.5 115, 225 75, 0 95
+    Z
+  `
 
   useEffect(() => {
     let startTime: number | null = null
@@ -72,61 +93,37 @@ export function WaveMarquee({ text, variant = "lavender", speed = 45 }: WaveMarq
   }, [speed])
 
   return (
-    <div className="w-full relative" style={{ height: "120px", marginTop: "-20px" }}>
-      <svg className="w-full h-full" viewBox="0 0 1600 120" preserveAspectRatio="none" style={{ overflow: "visible" }}>
+    <div className="w-full relative" style={{ height: "132px", marginTop: "-22px" }}>
+      <svg className="w-full h-full" viewBox="0 0 1800 120" preserveAspectRatio="none" style={{ overflow: "visible" }}>
         <defs>
           <path
             id={textPathId}
-            d="
-              M-1600 68
-              C-1400 38, -1200 98, -1000 68
-              C-800 38, -600 98, -400 68
-              C-200 38, 0 98, 200 68
-              C400 38, 600 98, 800 68
-              C1000 38, 1200 98, 1400 68
-              C1600 38, 1800 98, 2000 68
-              C2200 38, 2400 98, 2600 68
-              C2800 38, 3000 98, 3200 68
-            "
+            d={topWavePath}
+            transform={`translate(0 ${textYOffset})`}
             fill="none"
           />
         </defs>
 
         <path
-          d="
-            M0 30
-            C100 5, 200 55, 400 25
-            C600 -5, 800 45, 1000 20
-            C1200 -5, 1400 40, 1600 15
-            L1600 90
-            C1400 115, 1200 65, 1000 95
-            C800 125, 600 75, 400 100
-            C200 130, 100 80, 0 105
-            Z
-          "
+          d={fillWavePath}
           fill={colors.fill}
         />
 
         <text
           fill={colors.text}
-          fontSize="48"
+          fontSize="33"
           fontWeight="500"
           letterSpacing="0.08em"
           fontFamily="Georgia, 'Times New Roman', serif"
           fontStyle="italic"
         >
-          <textPath href={`#${textPathId}`} startOffset={`${offset}%`}>
+          <textPath href={`#${textPathId}`} startOffset={`${offset}%`} dy="20">
             {repeatedText}
           </textPath>
         </text>
 
         <path
-          d="
-            M0 30
-            C100 5, 200 55, 400 25
-            C600 -5, 800 45, 1000 20
-            C1200 -5, 1400 40, 1600 15
-          "
+          d={topWavePath}
           fill="none"
           stroke="white"
           strokeWidth="1.5"

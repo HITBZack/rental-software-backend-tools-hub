@@ -37,6 +37,16 @@ const tools = [
     color: "bg-pastel-blue",
   },
   {
+    name: "Rental Reminders",
+    description:
+      "Automated email and SMS reminders for bookings: confirmations, delivery notices, payment reminders, and more.",
+    icon: ArrowRightIcon,
+    href: "https://rentalreminder.com",
+    available: true,
+    color: "bg-pastel-mint",
+    external: true,
+  },
+  {
     name: "WordPress Plugin",
     description:
       "Download our WordPress plugin to customize Booqable UI elements like product displays, lightboxes, and cart popups.",
@@ -75,7 +85,7 @@ export default function DashboardPage() {
           {tools.map((tool, index) => (
             <Card
               key={tool.name}
-              className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg animate-fade-in ${
+              className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg animate-fade-in flex flex-col ${
                 !tool.available ? "opacity-60" : ""
               }`}
               style={{ animationDelay: `${index * 100}ms` }}
@@ -97,14 +107,23 @@ export default function DashboardPage() {
                 <CardDescription className="text-pretty">{tool.description}</CardDescription>
               </CardHeader>
 
-              <CardContent>
+              <CardContent className="mt-auto">
                 {tool.available ? (
-                  <Link href={tool.href}>
-                    <Button className="w-full group/btn">
-                      Open Tool
-                      <ArrowRightIcon className="h-4 w-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
-                    </Button>
-                  </Link>
+                  tool.external ? (
+                    <a href={tool.href} target="_blank" rel="noopener noreferrer">
+                      <Button className="w-full group/btn">
+                        Open Tool
+                        <ArrowRightIcon className="h-4 w-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
+                      </Button>
+                    </a>
+                  ) : (
+                    <Link href={tool.href}>
+                      <Button className="w-full group/btn">
+                        Open Tool
+                        <ArrowRightIcon className="h-4 w-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
+                      </Button>
+                    </Link>
+                  )
                 ) : (
                   <Button disabled className="w-full">
                     Coming Soon

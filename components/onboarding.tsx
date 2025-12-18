@@ -10,13 +10,18 @@ import { SparklesIcon, ShieldIcon, BoltIcon, ArrowRightIcon, CheckCircleIcon, Lo
 import { WaveMarquee } from "./wave-marquee"
 import { Footer } from "./footer"
 import { ApiKeyHelpModal } from "./api-key-help-modal"
+import { normalizeApiKey, testApiConnection } from "@/lib/api"
 
 interface OnboardingProps {
-  onComplete: (settings: { apiKey: string; pageSize: number; sleepDelay: number }) => void
+  onComplete: (settings: { apiKey: string; businessSlug: string; pageSize: number; sleepDelay: number }) => void
+  embedded?: boolean
+  showMarquee?: boolean
+  showFooter?: boolean
 }
 
-export function Onboarding({ onComplete }: OnboardingProps) {
+export function Onboarding({ onComplete, embedded = false, showMarquee = true, showFooter = true }: OnboardingProps) {
   const [step, setStep] = useState(1)
+  const [businessSlug, setBusinessSlug] = useState("")
   const [apiKey, setApiKey] = useState("")
   const [pageSize, setPageSize] = useState("50")
   const [sleepDelay, setSleepDelay] = useState("500")
@@ -24,7 +29,23 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState("")
 
+  const normalizeSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-")
+
   const handleTestConnection = async () => {
+    const normalizedSlug = normalizeSlug(businessSlug)
+
+    if (!normalizedSlug) {
+      setErrorMessage("Please enter your business slug")
+      setConnectionStatus("error")
+      return
+    }
+
+    if (!/^[a-z0-9-]+$/.test(normalizedSlug)) {
+      setErrorMessage("Business slug can only contain letters, numbers, and hyphens")
+      setConnectionStatus("error")
+      return
+    }
+
     if (!apiKey.trim()) {
       setErrorMessage("Please enter your API key")
       setConnectionStatus("error")
@@ -35,19 +56,12 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     setConnectionStatus("idle")
     setErrorMessage("")
 
-    await new Promise((resolve) => setTimeout(resolve, 800)) // Simulate loading
-    setConnectionStatus("success")
-    setIsTestingConnection(false)
-    setTimeout(() => setStep(2), 1000)
-    return
-
-    // Original code below (commented out for now)
-    /*
     try {
-      const isValid = await testApiConnection(apiKey.trim())
+      const cleanApiKey = normalizeApiKey(apiKey)
+      const isValid = await testApiConnection(cleanApiKey, normalizedSlug)
       if (isValid) {
         setConnectionStatus("success")
-        setTimeout(() => setStep(2), 1000)
+        setTimeout(() => setStep(2), 700)
       } else {
         setConnectionStatus("error")
         setErrorMessage("Could not connect. Please check your API key.")
@@ -58,12 +72,12 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     } finally {
       setIsTestingConnection(false)
     }
-    */
   }
 
   const handleComplete = () => {
     onComplete({
-      apiKey: apiKey.trim(),
+      apiKey: normalizeApiKey(apiKey),
+      businessSlug: normalizeSlug(businessSlug),
       pageSize: Number.parseInt(pageSize),
       sleepDelay: Number.parseInt(sleepDelay),
     })
@@ -76,9 +90,15 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   ]
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className={embedded ? "bg-background flex flex-col" : "min-h-screen bg-background flex flex-col"}>
       {/* Hero Section */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+      <div
+        className={
+          embedded
+            ? "flex flex-col items-center justify-center px-4 py-12"
+            : "flex-1 flex flex-col items-center justify-center px-4 py-12"
+        }
+      >
         <div className="text-center mb-8 animate-fade-in">
           <h1 className="text-4xl font-bold text-foreground mb-3 text-balance">Welcome to Booqable Helper</h1>
           <p className="text-lg text-muted-foreground max-w-md mx-auto text-pretty">
@@ -107,6 +127,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <CardContent className="space-y-4">
             {step === 1 ? (
               <>
+                <div className="space-y-2">
+                  <Label htmlFor="businessSlug">Business slug</Label>
+                  <Input
+                    id="businessSlug"
+                    placeholder="your-company"
+                    value={businessSlug}
+                    onChange={(e) => setBusinessSlug(e.target.value)}
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">Used to build URLs like https://your-company.booqable.com</p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="apiKey">API Key</Label>
                   <Input
@@ -209,13 +241,15 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         </div>
       </div>
 
-      <WaveMarquee
-        text="Secure Local Storage Only No Server Storage Your Data Stays Private"
-        variant="lavender"
-        speed={45}
-      />
+      {showMarquee && (
+        <WaveMarquee
+          text="Secure Local Storage Only No Server Storage Your Data Stays Private"
+          variant="lavender"
+          speed={45}
+        />
+      )}
 
-      <Footer />
+      {showFooter && <Footer />}
     </div>
   )
 }

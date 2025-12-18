@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useSettings } from "@/lib/use-settings"
 import { clearSettings } from "@/lib/storage"
-import { testApiConnection } from "@/lib/api"
+import { normalizeApiKey, testApiConnection } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import {
   GearIcon,
@@ -25,20 +25,26 @@ export default function SettingsPage() {
   const router = useRouter()
   const { settings, updateSettings } = useSettings()
   const [newApiKey, setNewApiKey] = useState("")
+  const [newBusinessSlug, setNewBusinessSlug] = useState("")
   const [isTestingKey, setIsTestingKey] = useState(false)
   const [keyStatus, setKeyStatus] = useState<"idle" | "success" | "error">("idle")
   const [showResetConfirm, setShowResetConfirm] = useState(false)
 
+  const normalizeSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-")
+  const isValidSlug = (value: string) => /^[a-z0-9-]+$/.test(value)
+
   const handleUpdateApiKey = async () => {
     if (!newApiKey.trim()) return
+
+    const cleanApiKey = normalizeApiKey(newApiKey)
 
     setIsTestingKey(true)
     setKeyStatus("idle")
 
     try {
-      const isValid = await testApiConnection(newApiKey.trim())
+      const isValid = await testApiConnection(cleanApiKey, settings.businessSlug)
       if (isValid) {
-        updateSettings({ apiKey: newApiKey.trim() })
+        updateSettings({ apiKey: cleanApiKey })
         setKeyStatus("success")
         setNewApiKey("")
         setTimeout(() => setKeyStatus("idle"), 3000)
@@ -90,6 +96,36 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
+              <CheckCircleIcon className="h-4 w-4 text-primary" />
+              <span className="text-sm text-muted-foreground">Business slug: {settings.businessSlug || "Not set"}</span>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="businessSlug">Update Business Slug</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="businessSlug"
+                  placeholder="your-company"
+                  value={newBusinessSlug}
+                  onChange={(e) => setNewBusinessSlug(e.target.value)}
+                  className="font-mono"
+                />
+                <Button
+                  onClick={() => {
+                    const normalized = normalizeSlug(newBusinessSlug)
+                    if (!normalized) return
+                    if (!isValidSlug(normalized)) return
+                    updateSettings({ businessSlug: normalized })
+                    setNewBusinessSlug("")
+                  }}
+                  disabled={!newBusinessSlug.trim()}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
               <CheckCircleIcon className="h-4 w-4 text-primary" />
               <span className="text-sm text-muted-foreground">

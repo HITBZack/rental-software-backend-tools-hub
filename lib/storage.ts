@@ -3,13 +3,19 @@
 
 export interface PlatformSettings {
   apiKey: string
+  businessSlug: string
   pageSize: number
   sleepDelay: number
   hasCompletedOnboarding: boolean
   referralFieldName: string
   hasCompletedReferralOnboarding: boolean
   referralTooltipMessage: string
-  referralSetupMode: "existing" | "auto" | null
+  referralSetupMode: "existing" | "manual" | "auto" | null
+  referralLastScannedOrderId: string | null
+  referralLastScannedCreatedAt: string | null
+  referralSourceCounts: Record<string, number> | null
+  referralTotalOrdersScanned: number
+  referralOrdersWithReferral: number
   customStopwords: string | null
   hasAcceptedLocalStorage: boolean
 }
@@ -18,6 +24,7 @@ const STORAGE_KEY = "booqable-helper-settings"
 
 const defaultSettings: PlatformSettings = {
   apiKey: "",
+  businessSlug: "",
   pageSize: 50,
   sleepDelay: 500,
   hasCompletedOnboarding: false,
@@ -25,6 +32,11 @@ const defaultSettings: PlatformSettings = {
   hasCompletedReferralOnboarding: false,
   referralTooltipMessage: "Please let us know how you found out about us, we would love to know!",
   referralSetupMode: null,
+  referralLastScannedOrderId: null,
+  referralLastScannedCreatedAt: null,
+  referralSourceCounts: null,
+  referralTotalOrdersScanned: 0,
+  referralOrdersWithReferral: 0,
   customStopwords: null,
   hasAcceptedLocalStorage: false,
 }

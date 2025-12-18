@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,97 +8,18 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { WaveMarquee } from "@/components/wave-marquee"
+import { Progress } from "@/components/ui/progress"
+import { useSettings } from "@/lib/use-settings"
+import { fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
+import { deleteCachedValue, getCachedOrders, getCachedValue, setCachedOrders, setCachedValue } from "@/lib/orders-cache"
 import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon } from "@/components/icons"
-
-// Mock data for demonstration - will be replaced with real API data
-const mockOrders = [
-  {
-    id: "1",
-    dateRange: "Dec 12, 2025, 04:00 p.m. → Dec 13, 2025, 07:00 p.m.",
-    items: [
-      {
-        id: "1a",
-        name: "Metal Folding - Bright White - Fanback",
-        quantity: 45,
-        image: "/white-folding-chair.jpg",
-        picked: false,
-      },
-      { id: "1b", name: "Table - 5 ft Round - Wood", quantity: 6, image: "/round-wooden-table.jpg", picked: false },
-      {
-        id: "1c",
-        name: "Table - 6' folding - ABS plastic",
-        quantity: 3,
-        image: "/plastic-folding-table.jpg",
-        picked: false,
-      },
-      {
-        id: "1d",
-        name: 'Tablecloths - 120" Round (5ft. Round Tables)',
-        quantity: 6,
-        image: "/white-tablecloth.jpg",
-        picked: false,
-      },
-    ],
-  },
-  {
-    id: "2",
-    dateRange: "Dec 12, 2025, 10:00 p.m. → Dec 14, 2025, 05:00 p.m.",
-    items: [
-      { id: "2a", name: "White Serving Bar", quantity: 3, image: "/white-bar-counter.jpg", picked: false },
-      {
-        id: "2b",
-        name: "Cherry Blossom Tree - White",
-        quantity: 2,
-        image: "/white-cherry-blossom-tree-decor.jpg",
-        picked: false,
-      },
-      { id: "2c", name: "Plinth White 5 Pc Set", quantity: 1, image: "/white-display-plinth-set.jpg", picked: false },
-      {
-        id: "2d",
-        name: "Round Cylinder Plinth 3PC Set",
-        quantity: 1,
-        image: "/cylinder-plinth-set.jpg",
-        picked: false,
-      },
-    ],
-  },
-  {
-    id: "3",
-    dateRange: "Dec 13, 2025, 03:00 p.m. → Dec 14, 2025, 11:00 p.m.",
-    items: [
-      {
-        id: "3a",
-        name: "Emerald Green Velvet Loveseat",
-        quantity: 1,
-        image: "/green-velvet-loveseat.jpg",
-        picked: false,
-      },
-      { id: "3b", name: "Nutcracker", quantity: 2, image: "/christmas-nutcracker-decoration.jpg", picked: false },
-      {
-        id: "3c",
-        name: "Christmas Presents red wire frame",
-        quantity: 2,
-        image: "/red-wire-frame-gift-decoration.jpg",
-        picked: false,
-      },
-      { id: "3d", name: "Set of 3 Reindeer", quantity: 1, image: "/reindeer-decoration-set.jpg", picked: false },
-      {
-        id: "3e",
-        name: "Santa Stop Here Lighted Sign",
-        quantity: 1,
-        image: "/santa-stop-here-sign.jpg",
-        picked: false,
-      },
-      { id: "3f", name: "Candy swirl food stool", quantity: 1, image: "/candy-swirl-stool.jpg", picked: false },
-    ],
-  },
-]
 
 interface OrderItem {
   id: string
   name: string
   quantity: number
-  image: string
+  image?: string
+  booqableItemId?: string
   picked: boolean
 }
 
@@ -108,7 +29,124 @@ interface Order {
   items: OrderItem[]
 }
 
+type BooqableLine = {
+  id: string
+  title?: string
+  quantity?: number
+  quantity_as_decimal?: string
+  item_id?: string
+  product_id?: string
+  [key: string]: unknown
+}
+
+type BooqableOrder = {
+  id: string
+  number?: string | number
+  starts_at?: string
+  stops_at?: string
+  status?: string
+  statuses?: string[]
+  lines?: BooqableLine[]
+  item_count?: number
+  [key: string]: unknown
+}
+
+const PICKED_STORAGE_KEY = "orderPickingPicked"
+
+type ItemPhotoMapEntry = {
+  item_id: string
+  item_name: string
+  photo_url: string
+  photo_key: string
+}
+
+type ItemPhotoMap = {
+  version: 1
+  entries: Record<string, ItemPhotoMapEntry>
+}
+
+function buildItemPhotoMapCacheKey(businessSlug: string): string {
+  return `itemPhotosMap:${businessSlug.trim().toLowerCase()}`
+}
+
+function buildItemPhotoBlobCacheKey(businessSlug: string, photoKey: string): string {
+  return `itemPhotoBlob:${businessSlug.trim().toLowerCase()}:${photoKey}`
+}
+
+function extractPhotoKeyFromUrl(photoUrl: string): string | null {
+  try {
+    const url = new URL(photoUrl)
+    const marker = "/uploads/"
+    const idx = url.pathname.indexOf(marker)
+    if (idx === -1) return null
+    const after = url.pathname.slice(idx + marker.length)
+    const parts = after.split("/").filter(Boolean)
+    if (parts.length < 2) return null
+    return parts.slice(0, -1).join("/")
+  } catch {
+    return null
+  }
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function formatDateTime(dt: string | undefined): string {
+  if (!dt) return ""
+  const d = new Date(dt)
+  if (Number.isNaN(d.getTime())) return ""
+  return d
+    .toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(", ", ", ")
+    .replace("AM", "a.m.")
+    .replace("PM", "p.m.")
+}
+
+function buildDateRange(order: BooqableOrder): string {
+  const start = formatDateTime(order.starts_at)
+  const stop = formatDateTime(order.stops_at)
+  if (start && stop) return `${start} → ${stop}`
+  return start || stop || ""
+}
+
+function parseNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string") {
+    const n = Number.parseFloat(value)
+    if (Number.isFinite(n)) return n
+  }
+  return 0
+}
+
+function getOrderLines(order: BooqableOrder): BooqableLine[] {
+  return Array.isArray(order.lines) ? order.lines : []
+}
+
+function isOrderInDateRange(order: BooqableOrder, startDate: string, endDate: string): boolean {
+  if (!order.starts_at) return false
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T23:59:59`)
+  const orderStart = new Date(order.starts_at)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || Number.isNaN(orderStart.getTime())) return true
+  return orderStart >= start && orderStart <= end
+}
+
 export default function OrderPickingPage() {
+  const { settings } = useSettings()
   const [startDate, setStartDate] = useState(() => {
     const today = new Date()
     return today.toISOString().split("T")[0]
@@ -119,21 +157,211 @@ export default function OrderPickingPage() {
     return future.toISOString().split("T")[0]
   })
   const [sortByQuantity, setSortByQuantity] = useState(true)
-  const [orders, setOrders] = useState<Order[]>(mockOrders)
+  const [rawOrders, setRawOrders] = useState<BooqableOrder[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [lastFetched, setLastFetched] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [progressText, setProgressText] = useState("")
+  const [error, setError] = useState<string | null>(null)
   const [combineAll, setCombineAll] = useState(false)
+  const [showImages, setShowImages] = useState(false)
+  const [itemPhotosMap, setItemPhotosMap] = useState<ItemPhotoMap | null>(null)
+  const [imageBuildProgress, setImageBuildProgress] = useState(0)
+  const [imageBuildText, setImageBuildText] = useState("")
+  const [imageBuildError, setImageBuildError] = useState<string | null>(null)
+  const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({})
+  const localImageUrlsRef = useRef<Record<string, string>>({})
+  useEffect(() => {
+    localImageUrlsRef.current = localImageUrls
+  }, [localImageUrls])
+  const [pickedKeys, setPickedKeys] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(PICKED_STORAGE_KEY)
+      const parsed = raw ? (JSON.parse(raw) as string[]) : []
+      return new Set(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      return new Set()
+    }
+  })
+  const pickedKeysRef = useRef(pickedKeys)
+  useEffect(() => {
+    pickedKeysRef.current = pickedKeys
+    try {
+      localStorage.setItem(PICKED_STORAGE_KEY, JSON.stringify(Array.from(pickedKeys)))
+    } catch {
+      // ignore
+    }
+  }, [pickedKeys])
+
+  const applyCurrentFilter = useCallback(
+    (sourceOrders: BooqableOrder[]) => {
+      const filtered = sourceOrders.filter((o) => isOrderInDateRange(o, startDate, endDate))
+      const uiOrders: Order[] = filtered
+        .map((o) => {
+          const dateRange = buildDateRange(o)
+          const lines = getOrderLines(o)
+          const items = lines
+            .map((l) => {
+              const id = l.id ?? `${o.id}:${String(l.item_id ?? l.title ?? "line")}`
+              const name = (typeof l.title === "string" && l.title.trim().length > 0 ? l.title : "Item")
+              const qty = parseNumber(l.quantity ?? l.quantity_as_decimal)
+              const pickedKey = `${o.id}:${id}`
+              const booqableItemId = typeof l.item_id === "string" ? l.item_id : undefined
+              return {
+                id,
+                name,
+                quantity: qty,
+                booqableItemId,
+                picked: pickedKeysRef.current.has(pickedKey),
+              }
+            })
+            .filter((i) => i.quantity > 0)
+
+          return {
+            id: o.id,
+            dateRange,
+            items,
+          }
+        })
+        .filter((o) => o.items.length > 0)
+
+      setOrders(uiOrders)
+    },
+    [endDate, startDate],
+  )
+
+  const fetchOrderWithLines = useCallback(
+    async (order: BooqableOrder): Promise<BooqableOrder> => {
+      const businessSlug = settings?.businessSlug
+      const apiKey = settings?.apiKey
+      if (!businessSlug || !apiKey) return order
+
+      if (getOrderLines(order).length > 0) return order
+
+      try {
+        const response = await fetchFromBooqableTenant<unknown>(`orders/${order.id}/lines`, businessSlug, apiKey)
+        const obj = (response ?? {}) as Record<string, unknown>
+        const linesCandidate = obj.lines
+        const lines = Array.isArray(linesCandidate) ? (linesCandidate as BooqableLine[]) : []
+        return { ...order, lines }
+      } catch {
+        return order
+      }
+    },
+    [settings?.apiKey, settings?.businessSlug],
+  )
+
+  const loadOrders = useCallback(
+    async ({ forceRefresh }: { forceRefresh: boolean }) => {
+      setError(null)
+      setProgress(0)
+      setProgressText("")
+
+      if (!settings) {
+        setError("Settings not loaded")
+        return
+      }
+      if (!settings.apiKey || !settings.businessSlug) {
+        setError("Missing API key or business slug. Please configure your settings first.")
+        return
+      }
+
+      setIsLoading(true)
+      try {
+        let ordersList: BooqableOrder[] | null = null
+
+        if (!forceRefresh) {
+          const cached = await getCachedOrders<BooqableOrder>(settings.businessSlug)
+          if (cached?.orders?.length) {
+            ordersList = cached.orders
+            setLastFetched(new Date(cached.fetchedAt).toLocaleTimeString())
+          }
+        }
+
+        if (!ordersList) {
+          ordersList = await getAllPaginated<BooqableOrder>("orders", {
+            onProgress: (fetched, total) => {
+              if (total) {
+                setProgress((fetched / total) * 100)
+                setProgressText(`Fetched ${fetched} of ${total} orders...`)
+              } else {
+                setProgressText(`Fetched ${fetched} orders...`)
+              }
+            },
+          })
+          await setCachedOrders<BooqableOrder>(settings.businessSlug, ordersList)
+          setLastFetched(new Date().toLocaleTimeString())
+        }
+
+        const filteredForEnrichment = ordersList.filter((o) => isOrderInDateRange(o, startDate, endDate))
+        const needsLines = filteredForEnrichment.filter((o) => getOrderLines(o).length === 0)
+
+        if (needsLines.length > 0) {
+          setProgressText(`Loading items for ${needsLines.length} orders...`)
+          const enriched = await Promise.all(needsLines.map((o) => fetchOrderWithLines(o)))
+          const enrichedById = new Map(enriched.map((o) => [o.id, o]))
+          const merged = ordersList.map((o) => enrichedById.get(o.id) ?? o)
+          ordersList = merged
+          await setCachedOrders<BooqableOrder>(settings.businessSlug, merged)
+        }
+
+        setRawOrders(ordersList)
+        applyCurrentFilter(ordersList)
+        setProgressText("")
+        setProgress(0)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load orders")
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [applyCurrentFilter, fetchOrderWithLines, settings, endDate, startDate],
+  )
+
+  useEffect(() => {
+    if (!settings?.businessSlug) return
+    void loadOrders({ forceRefresh: false })
+  }, [loadOrders, settings?.businessSlug])
+
+  useEffect(() => {
+    if (!settings?.businessSlug) return
+    const key = buildItemPhotoMapCacheKey(settings.businessSlug)
+    void getCachedValue<ItemPhotoMap>(key)
+      .then((cached) => {
+        if (cached?.value) {
+          setItemPhotosMap(cached.value)
+          setShowImages(true)
+        } else {
+          setItemPhotosMap(null)
+          setShowImages(false)
+        }
+      })
+      .catch(() => {
+        setItemPhotosMap(null)
+        setShowImages(false)
+      })
+  }, [settings?.businessSlug])
+
+  useEffect(() => {
+    return () => {
+      const urls = Object.values(localImageUrlsRef.current)
+      for (const url of urls) {
+        try {
+          URL.revokeObjectURL(url)
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [])
 
   const handleRefresh = async () => {
-    setIsLoading(true)
-    // Simulate API call - will be replaced with real implementation
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setLastFetched(new Date().toLocaleTimeString())
-    setIsLoading(false)
+    await loadOrders({ forceRefresh: true })
   }
 
   const handleApplyFilter = () => {
-    handleRefresh()
+    applyCurrentFilter(rawOrders)
   }
 
   const toggleItemPicked = (orderId: string, itemId: string) => {
@@ -147,6 +375,14 @@ export default function OrderPickingPage() {
           : order,
       ),
     )
+
+    const key = `${orderId}:${itemId}`
+    setPickedKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   const unpickAll = () => {
@@ -156,6 +392,7 @@ export default function OrderPickingPage() {
         items: order.items.map((item) => ({ ...item, picked: false })),
       })),
     )
+    setPickedKeys(new Set())
   }
 
   const getCombinedItems = () => {
@@ -176,12 +413,222 @@ export default function OrderPickingPage() {
     return items
   }
 
-  const sortedOrders = sortByQuantity
-    ? orders.map((order) => ({
-        ...order,
-        items: [...order.items].sort((a, b) => b.quantity - a.quantity),
-      }))
-    : orders
+  const sortedOrders = useMemo(() => {
+    return sortByQuantity
+      ? orders.map((order) => ({
+          ...order,
+          items: [...order.items].sort((a, b) => b.quantity - a.quantity),
+        }))
+      : orders
+  }, [orders, sortByQuantity])
+
+  const toggleCombinedItemByName = useCallback(
+    (itemName: string, currentlyPicked: boolean) => {
+      setOrders((prevOrders) =>
+        prevOrders.map((order) => ({
+          ...order,
+          items: order.items.map((i) => (i.name === itemName ? { ...i, picked: !currentlyPicked } : i)),
+        })),
+      )
+
+      setPickedKeys((prev) => {
+        const next = new Set(prev)
+        for (const order of orders) {
+          for (const item of order.items) {
+            if (item.name !== itemName) continue
+            const key = `${order.id}:${item.id}`
+            if (currentlyPicked) next.delete(key)
+            else next.add(key)
+          }
+        }
+        return next
+      })
+    },
+    [orders],
+  )
+
+  const buildItemPhotoMapAndDownload = useCallback(async () => {
+    setImageBuildError(null)
+    setImageBuildProgress(0)
+    setImageBuildText("")
+
+    if (!settings?.businessSlug || !settings?.apiKey) {
+      setImageBuildError("Missing API key or business slug. Please configure your settings first.")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const slug = settings.businessSlug.trim().toLowerCase().replace(/\s+/g, "-")
+      const baseUrl = `https://${slug}.booqable.com/api/4/items`
+
+      const allEntries: ItemPhotoMapEntry[] = []
+      let page = 1
+      let keepGoing = true
+      while (keepGoing) {
+        const url = new URL(baseUrl)
+        url.searchParams.set("fields[items]", "id,name,photo_url")
+        url.searchParams.set("page[number]", page.toString())
+        url.searchParams.set("page[size]", "100")
+        const response = await fetchWithTimeout(url.toString(), {
+          headers: {
+            Authorization: `Bearer ${settings.apiKey}`,
+            Accept: "application/vnd.api+json",
+          },
+        })
+
+        if (!response.ok) {
+          const text = await response.text()
+          throw new Error(`Failed to fetch items (page ${page}): ${response.status} ${text}`)
+        }
+
+        const json = (await response.json()) as {
+          data?: Array<{ id: string; attributes?: { name?: string; photo_url?: string | null } }>
+        }
+        const data = Array.isArray(json.data) ? json.data : []
+
+        for (const item of data) {
+          const itemId = item?.id
+          const itemName = item?.attributes?.name ?? ""
+          const photoUrl = item?.attributes?.photo_url ?? null
+          if (!itemId || !photoUrl) continue
+          const photoKey = extractPhotoKeyFromUrl(photoUrl)
+          if (!photoKey) continue
+          allEntries.push({ item_id: itemId, item_name: itemName, photo_url: photoUrl, photo_key: photoKey })
+        }
+
+        keepGoing = data.length === 100
+        page++
+        setImageBuildText(`Found ${allEntries.length} items with photos...`)
+      }
+
+      allEntries.sort((a, b) => a.item_name.localeCompare(b.item_name))
+
+      const map: ItemPhotoMap = {
+        version: 1,
+        entries: Object.fromEntries(allEntries.map((e) => [e.item_id, e])),
+      }
+
+      await setCachedValue<ItemPhotoMap>({
+        key: buildItemPhotoMapCacheKey(settings.businessSlug),
+        fetchedAt: new Date().toISOString(),
+        businessSlug: settings.businessSlug.trim().toLowerCase(),
+        value: map,
+      })
+      setItemPhotosMap(map)
+
+      const entries = Object.values(map.entries)
+      const total = entries.length
+      let completed = 0
+      let skipped = 0
+      let failed = 0
+
+      for (const entry of entries) {
+        const blobKey = buildItemPhotoBlobCacheKey(settings.businessSlug, entry.photo_key)
+        const existing = await getCachedValue<Blob>(blobKey)
+        if (existing?.value) {
+          skipped++
+          completed++
+          setImageBuildProgress((completed / total) * 100)
+          setImageBuildText(`Downloading images: ${completed}/${total} (skipped ${skipped}, failed ${failed})`)
+          continue
+        }
+
+        try {
+          const imgResponse = await fetchWithTimeout(entry.photo_url, {}, 30000)
+          if (!imgResponse.ok) {
+            failed++
+            completed++
+            continue
+          }
+          const blob = await imgResponse.blob()
+          await setCachedValue<Blob>({
+            key: blobKey,
+            fetchedAt: new Date().toISOString(),
+            businessSlug: settings.businessSlug.trim().toLowerCase(),
+            value: blob,
+          })
+        } catch {
+          failed++
+        } finally {
+          completed++
+          setImageBuildProgress((completed / total) * 100)
+          setImageBuildText(`Downloading images: ${completed}/${total} (skipped ${skipped}, failed ${failed})`)
+        }
+      }
+
+      setImageBuildText(`Images cached locally. Downloaded ${total - skipped - failed}, skipped ${skipped}, failed ${failed}.`)
+      setImageBuildProgress(100)
+      setShowImages(true)
+    } catch (e) {
+      setImageBuildError(e instanceof Error ? e.message : "Failed to build image cache")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [settings])
+
+  const clearImageCache = useCallback(async () => {
+    if (!settings?.businessSlug) return
+    setImageBuildError(null)
+    setImageBuildProgress(0)
+    setImageBuildText("")
+    try {
+      const mapKey = buildItemPhotoMapCacheKey(settings.businessSlug)
+      const existingMap = await getCachedValue<ItemPhotoMap>(mapKey)
+      const map = existingMap?.value
+      if (map?.entries) {
+        const entries = Object.values(map.entries)
+        for (const entry of entries) {
+          await deleteCachedValue(buildItemPhotoBlobCacheKey(settings.businessSlug, entry.photo_key))
+        }
+      }
+      await deleteCachedValue(mapKey)
+      setItemPhotosMap(null)
+      setShowImages(false)
+      const urls = Object.values(localImageUrlsRef.current)
+      for (const url of urls) {
+        try {
+          URL.revokeObjectURL(url)
+        } catch {
+          // ignore
+        }
+      }
+      setLocalImageUrls({})
+    } catch (e) {
+      setImageBuildError(e instanceof Error ? e.message : "Failed to clear image cache")
+    }
+  }, [settings?.businessSlug])
+
+  const resolveLocalImageUrl = useCallback(
+    async (itemId: string): Promise<string | null> => {
+      if (!settings?.businessSlug) return null
+      if (!itemPhotosMap?.entries?.[itemId]) return null
+      const entry = itemPhotosMap.entries[itemId]
+      const existing = localImageUrlsRef.current[itemId]
+      if (existing) return existing
+      const blobKey = buildItemPhotoBlobCacheKey(settings.businessSlug, entry.photo_key)
+      const blobRecord = await getCachedValue<Blob>(blobKey)
+      const blob = blobRecord?.value
+      if (!blob) return null
+      const url = URL.createObjectURL(blob)
+      setLocalImageUrls((prev) => ({ ...prev, [itemId]: url }))
+      return url
+    },
+    [itemPhotosMap, settings?.businessSlug],
+  )
+
+  useEffect(() => {
+    if (!showImages) return
+    const itemIds = new Set<string>()
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (item.booqableItemId) itemIds.add(item.booqableItemId)
+      }
+    }
+    const missing = Array.from(itemIds).filter((id) => !localImageUrlsRef.current[id])
+    if (missing.length === 0) return
+    void Promise.all(missing.slice(0, 30).map((id) => resolveLocalImageUrl(id)))
+  }, [orders, resolveLocalImageUrl, showImages])
 
   return (
     <div className="flex flex-col min-h-full">
@@ -246,6 +693,47 @@ export default function OrderPickingPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Product images (optional)</CardTitle>
+            <CardDescription>
+              You can use the tool without images. Building an image cache can take time and store many images in your browser storage.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={buildItemPhotoMapAndDownload} disabled={isLoading} variant="secondary">
+                Build local image cache
+              </Button>
+              <Button onClick={clearImageCache} disabled={isLoading || !itemPhotosMap} variant="ghost">
+                Clear image cache
+              </Button>
+              <div className="flex items-center gap-2">
+                <Switch checked={showImages} onCheckedChange={setShowImages} disabled={!itemPhotosMap} />
+                <Label>Show thumbnails</Label>
+              </div>
+              {itemPhotosMap && (
+                <span className="text-xs text-muted-foreground">{Object.keys(itemPhotosMap.entries).length} items mapped</span>
+              )}
+            </div>
+            {(imageBuildText || imageBuildProgress > 0) && (
+              <div className="space-y-2">
+                <Progress value={imageBuildProgress} />
+                {imageBuildText && <p className="text-xs text-muted-foreground">{imageBuildText}</p>}
+              </div>
+            )}
+            {imageBuildError && <p className="text-sm text-destructive">{imageBuildError}</p>}
+          </CardContent>
+        </Card>
+
+        {error && (
+          <Card className="border-destructive/40 bg-destructive/5">
+            <CardContent className="py-4">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3">
           <Button
@@ -273,6 +761,13 @@ export default function OrderPickingPage() {
           {lastFetched && <span className="text-sm text-muted-foreground">Last fetched: {lastFetched}</span>}
         </div>
 
+        {isLoading && (
+          <div className="space-y-2">
+            <Progress value={progress} />
+            {progressText && <p className="text-xs text-muted-foreground">{progressText}</p>}
+          </div>
+        )}
+
         {/* Orders Display */}
         {combineAll ? (
           <Card>
@@ -291,23 +786,14 @@ export default function OrderPickingPage() {
                         : "bg-card border-border hover:border-pastel-lavender/50"
                     }`}
                   >
-                    <img
-                      src={item.image || "/placeholder.svg"}
-                      alt={item.name}
-                      className="w-12 h-12 rounded-lg object-cover bg-muted"
-                    />
-                    <Checkbox
-                      checked={item.picked}
-                      onCheckedChange={() => {
-                        // Find and toggle all matching items
-                        setOrders((prevOrders) =>
-                          prevOrders.map((order) => ({
-                            ...order,
-                            items: order.items.map((i) => (i.name === item.name ? { ...i, picked: !item.picked } : i)),
-                          })),
-                        )
-                      }}
-                    />
+                    {showImages && (
+                      <img
+                        src={(item.booqableItemId && localImageUrls[item.booqableItemId]) || "/placeholder.svg"}
+                        alt={item.name}
+                        className="w-12 h-12 rounded-lg object-cover bg-muted"
+                      />
+                    )}
+                    <Checkbox checked={item.picked} onCheckedChange={() => toggleCombinedItemByName(item.name, item.picked)} />
                     <span className={`flex-1 ${item.picked ? "line-through text-muted-foreground" : ""}`}>
                       {item.name}
                     </span>
@@ -338,11 +824,13 @@ export default function OrderPickingPage() {
                       }`}
                       onClick={() => toggleItemPicked(order.id, item.id)}
                     >
-                      <img
-                        src={item.image || "/placeholder.svg"}
-                        alt={item.name}
-                        className="w-12 h-12 rounded-lg object-cover bg-muted"
-                      />
+                      {showImages && (
+                        <img
+                          src={(item.booqableItemId && localImageUrls[item.booqableItemId]) || "/placeholder.svg"}
+                          alt={item.name}
+                          className="w-12 h-12 rounded-lg object-cover bg-muted"
+                        />
+                      )}
                       <Checkbox
                         checked={item.picked}
                         onCheckedChange={() => toggleItemPicked(order.id, item.id)}
@@ -360,16 +848,14 @@ export default function OrderPickingPage() {
           </div>
         )}
 
-        {/* Placeholder for when real API is connected */}
-        <Card className="border-dashed border-2 bg-muted/20">
-          <CardContent className="py-8 text-center">
-            <PackageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
-              This is currently showing demo data. Once connected to your Booqable API, real orders will appear here
-              based on your selected date range.
-            </p>
-          </CardContent>
-        </Card>
+        {!isLoading && !error && orders.length === 0 && (
+          <Card className="border-dashed border-2 bg-muted/20">
+            <CardContent className="py-8 text-center">
+              <PackageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No order items found for the selected date range.</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <WaveMarquee text="track deliveries • manage inventory • stay organized" variant="blue" speed={30} />

@@ -14,6 +14,7 @@ import {
   GearIcon,
   LockIcon,
   ClipboardListIcon,
+  SparklesIcon,
 } from "@/components/icons"
 
 interface Tool {
@@ -22,6 +23,7 @@ interface Tool {
   icon: React.ReactNode
   description: string
   available: boolean
+  external?: boolean
 }
 
 const tools: Tool[] = [
@@ -52,6 +54,14 @@ const tools: Tool[] = [
     icon: <ClipboardListIcon className="h-5 w-5" />,
     description: "Track outgoing deliveries",
     available: true,
+  },
+  {
+    name: "Rental Reminders",
+    href: "https://rentalreminder.com",
+    icon: <SparklesIcon className="h-5 w-5" />,
+    description: "Automated email + SMS reminders",
+    available: true,
+    external: true,
   },
   {
     name: "WordPress Plugin",
@@ -97,22 +107,11 @@ export function Sidebar() {
       <nav className="flex-1 p-4 space-y-1">
         <p className="text-xs font-medium text-muted-foreground px-3 mb-3 uppercase tracking-wider">Tools</p>
         {tools.map((tool) => {
-          const isActive = pathname === tool.href
+          const isActive = !tool.external && pathname === tool.href
           const isDisabled = !tool.available
 
-          return (
-            <Link
-              key={tool.href}
-              href={isDisabled ? "#" : tool.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-                isDisabled && "opacity-50 cursor-not-allowed",
-              )}
-              onClick={(e) => isDisabled && e.preventDefault()}
-            >
+          const content = (
+            <>
               <span className={cn("transition-transform duration-200", !isDisabled && "group-hover:scale-110")}>
                 {tool.icon}
               </span>
@@ -123,6 +122,35 @@ export function Sidebar() {
               {isDisabled && (
                 <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">Soon</span>
               )}
+            </>
+          )
+
+          const className = cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+            isActive
+              ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+            isDisabled && "opacity-50 cursor-not-allowed",
+          )
+
+          if (tool.external) {
+            return (
+              <a
+                key={tool.href}
+                href={isDisabled ? "#" : tool.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={className}
+                onClick={(e) => isDisabled && e.preventDefault()}
+              >
+                {content}
+              </a>
+            )
+          }
+
+          return (
+            <Link key={tool.href} href={isDisabled ? "#" : tool.href} className={className} onClick={(e) => isDisabled && e.preventDefault()}>
+              {content}
             </Link>
           )
         })}
