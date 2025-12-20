@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { useSettings } from "@/lib/use-settings"
 import { fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
 import { deleteCachedValue, getCachedOrders, getCachedValue, setCachedOrders, setCachedValue } from "@/lib/orders-cache"
-import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon } from "@/components/icons"
+import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon, HelpCircleIcon } from "@/components/icons"
 
 interface OrderItem {
   id: string
@@ -270,16 +270,26 @@ export default function OrderPickingPage() {
       setIsLoading(true)
       try {
         let ordersList: BooqableOrder[] | null = null
+        let shouldRefresh = forceRefresh
 
         if (!forceRefresh) {
           const cached = await getCachedOrders<BooqableOrder>(settings.businessSlug)
           if (cached?.orders?.length) {
-            ordersList = cached.orders
-            setLastFetched(new Date(cached.fetchedAt).toLocaleTimeString())
+            const fetchedAt = typeof cached.fetchedAt === "number" ? cached.fetchedAt : Date.now()
+            const cacheAge = Date.now() - fetchedAt
+            const twentyFourHours = 24 * 60 * 60 * 1000
+
+            if (cacheAge > twentyFourHours) {
+              setProgressText("Cache is over 24 hours old, refreshing orders...")
+              shouldRefresh = true
+            } else {
+              ordersList = cached.orders
+              setLastFetched(new Date(fetchedAt).toLocaleTimeString())
+            }
           }
         }
 
-        if (!ordersList) {
+        if (!ordersList || shouldRefresh) {
           ordersList = await getAllPaginated<BooqableOrder>("orders", {
             onProgress: (fetched, total) => {
               if (total) {
@@ -735,30 +745,36 @@ export default function OrderPickingPage() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            onClick={handleRefresh}
-            disabled={isLoading}
-            className="bg-pastel-mint hover:bg-pastel-mint/80 text-foreground"
-          >
-            {isLoading ? (
-              <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshIcon className="h-4 w-4 mr-2" />
-            )}
-            Refresh Orders
-          </Button>
-          <Button
-            onClick={() => setCombineAll(!combineAll)}
-            variant={combineAll ? "default" : "secondary"}
-            className={combineAll ? "bg-foreground text-background" : ""}
-          >
-            {combineAll ? "Show by Date" : "Combine All Days"}
-          </Button>
-          <Button onClick={unpickAll} variant="secondary">
-            Unpick All
-          </Button>
-          {lastFetched && <span className="text-sm text-muted-foreground">Last fetched: {lastFetched}</span>}
+        <div className="flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="bg-pastel-mint hover:bg-pastel-mint/80 text-foreground"
+            >
+              {isLoading ? (
+                <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshIcon className="h-4 w-4 mr-2" />
+              )}
+              Refresh Orders
+            </Button>
+            <Button
+              onClick={() => setCombineAll(!combineAll)}
+              variant={combineAll ? "default" : "secondary"}
+              className={combineAll ? "bg-foreground text-background" : ""}
+            >
+              {combineAll ? "Show by Date" : "Combine All Days"}
+            </Button>
+            <Button onClick={unpickAll} variant="secondary">
+              Unpick All
+            </Button>
+            {lastFetched && <span className="text-sm text-muted-foreground">Last fetched: {lastFetched}</span>}
+          </div>
+          <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border border-border max-w-m w-full sm:w-auto">
+            <HelpCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
+            <p className="text-xs leading-snug">Click items to mark them as picked, makes keeping track easy</p>
+          </div>
         </div>
 
         {isLoading && (

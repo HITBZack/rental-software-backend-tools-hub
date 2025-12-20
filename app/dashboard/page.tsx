@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Footer } from "@/components/footer"
-import { ChartBarIcon, MagnifyingGlassIcon, WordPressIcon, ArrowRightIcon, ClipboardListIcon } from "@/components/icons"
+import { ChartBarIcon, MagnifyingGlassIcon, WordPressIcon, ArrowRightIcon, ClipboardListIcon, TruckIcon } from "@/components/icons"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -19,15 +19,6 @@ const tools = [
     color: "bg-pastel-lavender",
   },
   {
-    name: "Product Search Bar",
-    description:
-      "Generate a custom fuzzy search bar for your website with inventory-wide search that goes beyond Booqable's default.",
-    icon: MagnifyingGlassIcon,
-    href: "/dashboard/product-search-bar",
-    available: true,
-    color: "bg-pastel-mint",
-  },
-  {
     name: "Order Picking Helper",
     description:
       "Track which items are going out for delivery within a date range. Combines orders and shows quantities at a glance.",
@@ -37,12 +28,30 @@ const tools = [
     color: "bg-pastel-blue",
   },
   {
+    name: "Deliveries Manager",
+    description:
+      "Manage upcoming orders and assign delivery drivers. View customer contact info and delivery notes at a glance.",
+    icon: TruckIcon,
+    href: "/dashboard/deliveries-manager",
+    available: true,
+    color: "bg-pastel-peach",
+  },
+  {
+    name: "Product Search Bar",
+    description:
+      "Generate a custom fuzzy search bar for your website with inventory-wide search that goes beyond Booqable's default.",
+    icon: MagnifyingGlassIcon,
+    href: "/dashboard/product-search-bar",
+    available: true,
+    color: "bg-pastel-mint",
+  },
+  {
     name: "Rental Reminders",
     description:
       "Automated email and SMS reminders for bookings: confirmations, delivery notices, payment reminders, and more.",
     icon: ArrowRightIcon,
     href: "https://rentalreminder.com",
-    available: true,
+    available: false,
     color: "bg-pastel-mint",
     external: true,
   },
@@ -81,7 +90,7 @@ export default function DashboardPage() {
 
       {/* Tools Grid */}
       <div className="flex-1 p-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
           {tools.map((tool, index) => (
             <Card
               key={tool.name}

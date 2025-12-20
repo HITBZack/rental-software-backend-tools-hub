@@ -1,4 +1,4 @@
-export type ToolSlug = "referral-insights" | "product-search-bar" | "order-picking" | "wordpress-plugin" | "rental-reminders"
+export type ToolSlug = "referral-insights" | "product-search-bar" | "order-picking" | "deliveries-manager" | "wordpress-plugin" | "rental-reminders"
 
 export interface ToolDefinition {
   slug: ToolSlug
@@ -58,6 +58,23 @@ export const toolsCatalog: ToolDefinition[] = [
       "delivery preparation",
     ],
     dashboardPath: "/dashboard/order-picking",
+  },
+  {
+    slug: "deliveries-manager",
+    name: "Deliveries Manager",
+    tagline: "Manage upcoming orders and assign delivery drivers.",
+    description:
+      "Deliveries Manager is a Booqable tool for rental operations that lists upcoming orders with customer contact information, delivery notes, and allows you to assign and manage delivery drivers for each order.",
+    keywords: [
+      "booqable tools",
+      "booqable extensions",
+      "booqable deliveries",
+      "delivery management",
+      "driver assignment",
+      "order management",
+      "delivery tracking",
+    ],
+    dashboardPath: "/dashboard/deliveries-manager",
   },
   {
     slug: "wordpress-plugin",

@@ -14,6 +14,7 @@ import {
   GearIcon,
   LockIcon,
   ClipboardListIcon,
+  TruckIcon,
   SparklesIcon,
 } from "@/components/icons"
 
@@ -42,13 +43,6 @@ const tools: Tool[] = [
     available: true,
   },
   {
-    name: "Product Search Bar",
-    href: "/dashboard/product-search-bar",
-    icon: <MagnifyingGlassIcon className="h-5 w-5" />,
-    description: "Custom fuzzy search for your site",
-    available: true,
-  },
-  {
     name: "Order Picking Helper",
     href: "/dashboard/order-picking",
     icon: <ClipboardListIcon className="h-5 w-5" />,
@@ -56,11 +50,25 @@ const tools: Tool[] = [
     available: true,
   },
   {
+    name: "Deliveries Manager",
+    href: "/dashboard/deliveries-manager",
+    icon: <TruckIcon className="h-5 w-5" />,
+    description: "Manage orders and assign drivers",
+    available: true,
+  },
+  {
+    name: "Product Search Bar",
+    href: "/dashboard/product-search-bar",
+    icon: <MagnifyingGlassIcon className="h-5 w-5" />,
+    description: "Custom fuzzy search for your site",
+    available: true,
+  },
+  {
     name: "Rental Reminders",
     href: "https://rentalreminder.com",
     icon: <SparklesIcon className="h-5 w-5" />,
     description: "Automated email + SMS reminders",
-    available: true,
+    available: false,
     external: true,
   },
   {
