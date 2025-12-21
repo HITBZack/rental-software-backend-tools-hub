@@ -15,6 +15,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { clearCachedOrders, getCachedOrders, setCachedOrders } from "@/lib/orders-cache"
 import {
   ChartBarIcon,
+  CopyIcon,
+  ArrowRightIcon,
+  HeartIcon,
   DownloadIcon,
   RefreshIcon,
   LoaderIcon,
@@ -22,9 +25,6 @@ import {
   UsersIcon,
   PieChartIcon,
   CheckCircleIcon,
-  CopyIcon,
-  ArrowRightIcon,
-  SparklesIcon,
 } from "@/components/icons"
 import {
   PieChart as RechartsPie,
@@ -230,7 +230,7 @@ function ReferralOnboarding({
                   </div>
                   <div className="flex items-start gap-4">
                     <div className="h-12 w-12 rounded-xl bg-pastel-lavender flex items-center justify-center shrink-0">
-                      <SparklesIcon className="h-6 w-6 text-foreground" />
+                      <HeartIcon className="h-6 w-6 text-foreground" />
                     </div>
                     <div>
                       <p className="font-semibold text-lg text-card-foreground group-hover:text-primary transition-colors">

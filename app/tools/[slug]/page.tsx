@@ -15,7 +15,7 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   const tool = getToolBySlug(params.slug)
   if (!tool) return {}
 
-  const title = `${tool.name} | Booqable Tools & Extensions | ${getSiteName()}`
+  const title = `${tool.name} | Tools for Booqable Users (Unofficial) | ${getSiteName()}`
 
   return {
     title,
@@ -73,7 +73,7 @@ export default function ToolLandingPage({ params }: { params: { slug: string } }
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">
             <Link href="/tools" className="hover:underline">
-              Booqable Tools & Extensions
+              Tools for Booqable Users (Unofficial)
             </Link>
             <span className="mx-2">/</span>
             <span>{tool.name}</span>

@@ -1,4 +1,4 @@
-// Local storage manager for Booqable Helper Platform
+// Local storage manager for Backend Rental Tools Hub
 // Handles all persistent settings client-side only
 
 export interface PlatformSettings {

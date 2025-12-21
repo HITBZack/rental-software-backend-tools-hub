@@ -10,7 +10,7 @@ export function Footer() {
           <div className="space-y-3">
             <h3 className="font-semibold text-foreground">About</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Booqable Helper is a suite of tools designed to help rental businesses get more insights from their
+              Backend Rental Tools Hub is a suite of tools designed to help rental businesses get more insights from their
               Booqable data.
             </p>
           </div>

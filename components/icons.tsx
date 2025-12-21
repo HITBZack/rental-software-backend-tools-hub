@@ -1,21 +1,3 @@
-export function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M12 3L13.5 8.5L19 10L13.5 11.5L12 17L10.5 11.5L5 10L10.5 8.5L12 3Z" />
-      <path d="M19 15L20 17L22 18L20 19L19 21L18 19L16 18L18 17L19 15Z" />
-      <path d="M5 17L6 19L8 20L6 21L5 23L4 21L2 20L4 19L5 17Z" />
-    </svg>
-  )
-}
-
 export function ShieldIcon({ className }: { className?: string }) {
   return (
     <svg

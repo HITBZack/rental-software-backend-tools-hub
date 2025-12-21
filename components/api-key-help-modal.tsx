@@ -10,7 +10,7 @@ const steps = [
     title: "Open User Settings",
     description:
       "Click on your profile name in the bottom left corner of Booqable, then select 'User settings' from the dropdown menu.",
-    image: "/images/booqable1.png",
+    image: "/images/booqable1.jpg",
   },
   {
     number: 2,

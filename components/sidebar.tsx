@@ -15,7 +15,7 @@ import {
   LockIcon,
   ClipboardListIcon,
   TruckIcon,
-  SparklesIcon,
+  HeartIcon,
 } from "@/components/icons"
 
 interface Tool {
@@ -66,7 +66,7 @@ const tools: Tool[] = [
   {
     name: "Rental Reminders",
     href: "https://rentalreminder.com",
-    icon: <SparklesIcon className="h-5 w-5" />,
+    icon: <HeartIcon className="h-5 w-5" />,
     description: "Automated email + SMS reminders",
     available: false,
     external: true,
@@ -98,15 +98,15 @@ export function Sidebar() {
           <div className="h-10 w-10 rounded-xl overflow-hidden animate-pulse-glow">
             <Image
               src="/icon.png"
-              alt="Booqable Helper"
+              alt="Backend Rental Tools Hub"
               width={40}
               height={40}
               className="h-full w-full object-cover"
             />
           </div>
           <div>
-            <h1 className="font-semibold text-sidebar-foreground">Booqable</h1>
-            <p className="text-xs text-muted-foreground">Helper Platform</p>
+            <h1 className="font-semibold text-sidebar-foreground">Backend Rental</h1>
+            <p className="text-xs text-muted-foreground">Tools Hub</p>
           </div>
         </Link>
       </div>

@@ -25,7 +25,7 @@ export default function PrivacyPolicyClientPage() {
           <div className="h-12 w-12 rounded-xl overflow-hidden">
             <Image
               src="/icon.png"
-              alt="Booqable Helper"
+              alt="Backend Rental Tools Hub"
               width={48}
               height={48}
               className="h-full w-full object-cover"
@@ -40,8 +40,9 @@ export default function PrivacyPolicyClientPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">Overview</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Booqable Helper Platform ("we", "our", or "us") is committed to protecting your privacy. This Privacy
-              Policy explains how we collect, use, and safeguard your information when you use our platform.
+              Backend Rental Tools Hub ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy
+              explains how we collect, use, and safeguard your information when you use our platform. This project is
+              independent and not affiliated with Booqable.
             </p>
           </section>
 

@@ -25,7 +25,7 @@ export default function TermsOfServiceClientPage() {
           <div className="h-12 w-12 rounded-xl overflow-hidden">
             <Image
               src="/icon.png"
-              alt="Booqable Helper"
+              alt="Backend Rental Tools Hub"
               width={48}
               height={48}
               className="h-full w-full object-cover"
@@ -40,7 +40,7 @@ export default function TermsOfServiceClientPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">Acceptance of Terms</h2>
             <p className="text-muted-foreground leading-relaxed">
-              By accessing and using the Booqable Helper Platform, you accept and agree to be bound by these Terms of
+              By accessing and using the Backend Rental Tools Hub, you accept and agree to be bound by these Terms of
               Service. If you do not agree to these terms, please do not use our platform.
             </p>
           </section>
@@ -48,7 +48,7 @@ export default function TermsOfServiceClientPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">Description of Service</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Booqable Helper Platform provides tools and utilities to help rental businesses analyze and enhance their
+              Backend Rental Tools Hub provides tools and utilities to help rental businesses analyze and enhance their
               Booqable experience. Our services include referral insights, product search generation, WordPress plugin
               support, and other productivity tools.
             </p>
@@ -70,7 +70,7 @@ export default function TermsOfServiceClientPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">Disclaimer</h2>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              <strong>Not Affiliated with Booqable:</strong> Booqable Helper Platform is an independent project and is
+              <strong>Not Affiliated with Booqable:</strong> Backend Rental Tools Hub is an independent project and is
               not affiliated with, endorsed by, or officially connected to Booqable BV. Booqable is a trademark of
               Booqable BV.
             </p>
@@ -83,7 +83,7 @@ export default function TermsOfServiceClientPage() {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">Limitation of Liability</h2>
             <p className="text-muted-foreground leading-relaxed">
-              In no event shall Booqable Helper Platform, halfinthebox, or its creators be liable for any indirect,
+              In no event shall Backend Rental Tools Hub, halfinthebox, or its creators be liable for any indirect,
               incidental, special, consequential, or punitive damages resulting from your use of or inability to use the
               service.
             </p>

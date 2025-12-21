@@ -49,12 +49,12 @@ const installSteps = [
   {
     step: 3,
     title: "Activate the Plugin",
-    description: "After uploading, click 'Activate Plugin' to enable Booqable Helper on your site.",
+    description: "After uploading, click 'Activate Plugin' to enable the Backend Rental Tools Hub helper on your site.",
   },
   {
     step: 4,
     title: "Configure Settings",
-    description: "Navigate to Settings → Booqable Helper to customize your UI elements and styling options.",
+    description: "Navigate to Settings → Backend Rental Tools Hub to customize your UI elements and styling options.",
   },
 ]
 
@@ -94,7 +94,7 @@ export default function WordPressPluginPage() {
           <Card className="relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-pastel-peach opacity-10 rounded-full -translate-y-1/2 translate-x-1/2" />
             <CardHeader>
-              <CardTitle className="text-xl">Download Booqable Helper for WordPress</CardTitle>
+              <CardTitle className="text-xl">Download Backend Rental Tools Hub for WordPress</CardTitle>
               <CardDescription>
                 Our WordPress plugin allows you to customize and enhance how Booqable elements appear on your website.
                 Take control of product displays, cart popups, lightboxes, and more.

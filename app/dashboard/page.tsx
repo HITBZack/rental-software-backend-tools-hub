@@ -75,7 +75,7 @@ export default function DashboardPage() {
           <div className="h-12 w-12 rounded-xl overflow-hidden">
             <Image
               src="/icon.png"
-              alt="Booqable Helper"
+              alt="Backend Rental Tools Hub"
               width={48}
               height={48}
               className="h-full w-full object-cover"

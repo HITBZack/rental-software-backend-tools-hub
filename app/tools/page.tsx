@@ -7,19 +7,20 @@ import { toolsCatalog } from "@/lib/tools-catalog"
 import { Button } from "@/components/ui/button"
 
 export const metadata: Metadata = {
-  title: `Booqable Tools & Extensions | ${getSiteName()}`,
+  title: `Tools for Booqable Users (Unofficial) | ${getSiteName()}`,
   description:
-    "Explore Booqable tools and extensions that help rental businesses improve marketing insights, product search, and operational workflows.",
+    "Explore unofficial tools for Booqable users: improve marketing insights, product search, and operational workflows.",
   alternates: {
     canonical: "/tools",
   },
   keywords: [
     "booqable tools",
     "booqable extensions",
-    "booqable helper",
+    "rental tools hub",
     "booqable analytics",
     "booqable product search",
     "booqable wordpress plugin",
+    "unofficial booqable tools",
   ],
 }
 
@@ -29,7 +30,7 @@ export default function ToolsIndexPage() {
   const schema = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Booqable Tools and Extensions",
+    name: "Tools for Booqable Users (Unofficial)",
     itemListElement: toolsCatalog.map((tool, index) => ({
       "@type": "ListItem",
       position: index + 1,
@@ -44,7 +45,7 @@ export default function ToolsIndexPage() {
 
       <div className="max-w-5xl mx-auto px-6 py-14">
         <div className="flex flex-col gap-4">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground">Booqable Tools & Extensions</h1>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground">Tools for Booqable Users (Unofficial)</h1>
           <p className="text-muted-foreground text-lg max-w-3xl">
             Practical tools built for Booqable rental businesses. Use these utilities to improve marketing attribution,
             enhance your site search experience, and streamline day-to-day operations.
@@ -88,11 +89,11 @@ export default function ToolsIndexPage() {
         </div>
 
         <div className="mt-14 rounded-xl border border-border bg-muted/30 p-6">
-          <h2 className="text-lg font-semibold text-foreground">What is Booqable Helper Platform?</h2>
+          <h2 className="text-lg font-semibold text-foreground">What is Backend Rental Tools Hub?</h2>
           <p className="mt-2 text-muted-foreground">
-            Booqable Helper Platform is a suite of browser-based utilities that connect to your Booqable account using
-            your API key. Your key stays in your browser, and these tools focus on insights and productivity for rental
-            operations.
+            Backend Rental Tools Hub is an independent suite of browser-based utilities for Booqable users. Your API key
+            stays in your browser, and these tools focus on insights and productivity for rental operations. Not
+            affiliated with or endorsed by Booqable.
           </p>
         </div>
       </div>

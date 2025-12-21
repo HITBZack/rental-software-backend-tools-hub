@@ -1,4 +1,4 @@
-# Booqable helper platform
+# Backend Rental Tools Hub
 
 ## Local development
 

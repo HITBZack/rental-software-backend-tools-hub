@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   keywords: [
     "booqable tools",
     "booqable extensions",
-    "booqable helper",
+    "rental tools hub",
     "booqable referral insights",
     "booqable product search",
     "booqable wordpress plugin",

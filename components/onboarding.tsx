@@ -6,18 +6,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  SparklesIcon,
-  ShieldIcon,
-  BoltIcon,
-  ArrowRightIcon,
-  CheckCircleIcon,
-  LoaderIcon,
-  HelpCircleIcon,
-} from "@/components/icons"
+import { ShieldIcon, BoltIcon, ArrowRightIcon, CheckCircleIcon, LoaderIcon, HelpCircleIcon, HeartIcon } from "@/components/icons"
 import { WaveMarquee } from "./wave-marquee"
 import { Footer } from "./footer"
 import { ApiKeyHelpModal } from "./api-key-help-modal"
+import { BusinessSlugHelpModal } from "./business-slug-help-modal"
 import { normalizeApiKey, testApiConnection } from "@/lib/api"
 
 interface OnboardingProps {
@@ -119,7 +112,7 @@ export function Onboarding({ onComplete, embedded = false, showMarquee = true, s
   const features = [
     { icon: ShieldIcon, title: "Secure", desc: "API key stays local" },
     { icon: BoltIcon, title: "Fast", desc: "Optimized pagination" },
-    { icon: SparklesIcon, title: "Smart", desc: "Powerful insights" },
+    { icon: HeartIcon, title: "Helpful", desc: "Makes your life easier" },
   ]
 
   return (
@@ -133,7 +126,7 @@ export function Onboarding({ onComplete, embedded = false, showMarquee = true, s
         }
       >
         <div className="text-center mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold text-foreground mb-3 text-balance">Welcome to Booqable Helper</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-3 text-balance">Welcome to Backend Rental Tools Hub</h1>
           <p className="text-lg text-muted-foreground max-w-md mx-auto text-pretty">
             A suite of powerful tools to supercharge your rental business
           </p>
@@ -165,10 +158,7 @@ export function Onboarding({ onComplete, embedded = false, showMarquee = true, s
                     <Label htmlFor="businessSlug" className="mb-0">
                       Business slug
                     </Label>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <HelpCircleIcon className="h-4 w-4" />
-                      <span>Need help finding it?</span>
-                    </div>
+                    <BusinessSlugHelpModal />
                   </div>
                   <Input
                     id="businessSlug"
@@ -177,11 +167,6 @@ export function Onboarding({ onComplete, embedded = false, showMarquee = true, s
                     onChange={(e) => setBusinessSlug(e.target.value)}
                     className="font-mono"
                   />
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <p>1) Open your Booqable dashboard in the browser.</p>
-                    <p>2) Copy the full URL from the address bar, e.g. https://your-company.booqable.com/</p>
-                    <p>3) Paste it here — we’ll grab just the slug for you.</p>
-                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -259,7 +244,7 @@ export function Onboarding({ onComplete, embedded = false, showMarquee = true, s
                   </Button>
                   <Button onClick={handleComplete} className="flex-1">
                     Start Using Tools
-                    <SparklesIcon className="h-4 w-4 ml-2" />
+                    <HeartIcon className="h-4 w-4 ml-2" />
                   </Button>
                 </div>
               </>
