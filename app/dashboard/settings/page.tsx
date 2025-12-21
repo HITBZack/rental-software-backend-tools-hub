@@ -41,6 +41,12 @@ export default function SettingsPage() {
     setIsTestingKey(true)
     setKeyStatus("idle")
 
+    if (!settings || !settings.businessSlug) {
+      setKeyStatus("error")
+      setIsTestingKey(false)
+      return
+    }
+
     try {
       const isValid = await testApiConnection(cleanApiKey, settings.businessSlug)
       if (isValid) {
