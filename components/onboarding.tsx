@@ -6,7 +6,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SparklesIcon, ShieldIcon, BoltIcon, ArrowRightIcon, CheckCircleIcon, LoaderIcon } from "@/components/icons"
+import {
+  SparklesIcon,
+  ShieldIcon,
+  BoltIcon,
+  ArrowRightIcon,
+  CheckCircleIcon,
+  LoaderIcon,
+  HelpCircleIcon,
+} from "@/components/icons"
 import { WaveMarquee } from "./wave-marquee"
 import { Footer } from "./footer"
 import { ApiKeyHelpModal } from "./api-key-help-modal"
@@ -29,7 +37,32 @@ export function Onboarding({ onComplete, embedded = false, showMarquee = true, s
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState("")
 
-  const normalizeSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-")
+  const extractSlug = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return ""
+
+    // If a full URL was pasted, try to pull hostname portion before .booqable.com
+    try {
+      const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`)
+      const host = url.hostname.toLowerCase()
+      if (host.endsWith(".booqable.com")) {
+        const candidate = host.replace(".booqable.com", "")
+        if (candidate) return candidate
+      }
+    } catch {
+      // fall through to manual parsing
+    }
+
+    // Fallback: strip protocol and trailing paths, then stop at .booqable.com
+    const lowered = trimmed.toLowerCase()
+    const withoutProto = lowered.replace(/^https?:\/\//, "")
+    const beforePath = withoutProto.split(/[/?#]/)[0] || ""
+    const beforeDomain = beforePath.split(".booqable.com")[0] || beforePath
+
+    return beforeDomain.replace(/\s+/g, "-")
+  }
+
+  const normalizeSlug = (value: string) => extractSlug(value).replace(/[^a-z0-9-]/g, "")
 
   const handleTestConnection = async () => {
     const normalizedSlug = normalizeSlug(businessSlug)
@@ -128,15 +161,27 @@ export function Onboarding({ onComplete, embedded = false, showMarquee = true, s
             {step === 1 ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="businessSlug">Business slug</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="businessSlug" className="mb-0">
+                      Business slug
+                    </Label>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <HelpCircleIcon className="h-4 w-4" />
+                      <span>Need help finding it?</span>
+                    </div>
+                  </div>
                   <Input
                     id="businessSlug"
-                    placeholder="your-company"
+                    placeholder="your-company or https://your-company.booqable.com"
                     value={businessSlug}
                     onChange={(e) => setBusinessSlug(e.target.value)}
                     className="font-mono"
                   />
-                  <p className="text-xs text-muted-foreground">Used to build URLs like https://your-company.booqable.com</p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>1) Open your Booqable dashboard in the browser.</p>
+                    <p>2) Copy the full URL from the address bar, e.g. https://your-company.booqable.com/</p>
+                    <p>3) Paste it here — we’ll grab just the slug for you.</p>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
