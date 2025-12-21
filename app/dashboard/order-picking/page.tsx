@@ -234,35 +234,6 @@ export default function OrderPickingPage() {
     [endDate, startDate],
   )
 
-  const fetchOrderWithLines = useCallback(
-    async (order: BooqableOrder): Promise<BooqableOrder> => {
-      const businessSlug = settings?.businessSlug
-      const apiKey = settings?.apiKey
-      if (!businessSlug || !apiKey) return order
-
-      if (getOrderLines(order).length > 0) return order
-
-      const endpoints = [`order_lines?filter[order_id]=${order.id}`, `order_lines?order_id=${order.id}`]
-
-      for (const endpoint of endpoints) {
-        try {
-          const response = await fetchFromBooqableTenant<unknown>(endpoint, businessSlug, apiKey)
-          const obj = (response ?? {}) as Record<string, unknown>
-          const candidate = obj.order_lines ?? obj.lines ?? (Array.isArray(obj.data) ? obj.data : null)
-          const lines = Array.isArray(candidate) ? (candidate as BooqableLine[]) : []
-          if (lines.length > 0) {
-            return { ...order, lines }
-          }
-        } catch {
-          // swallow and try next endpoint
-        }
-      }
-
-      return order
-    },
-    [settings?.apiKey, settings?.businessSlug],
-  )
-
   const loadOrders = useCallback(
     async ({ forceRefresh }: { forceRefresh: boolean }) => {
       setError(null)
@@ -301,7 +272,7 @@ export default function OrderPickingPage() {
         }
 
         if (!ordersList || shouldRefresh) {
-          ordersList = await getAllPaginated<BooqableOrder>("orders?include=order_lines", {
+          ordersList = await getAllPaginated<BooqableOrder>("orders?include=lines", {
             onProgress: (fetched, total) => {
               if (total) {
                 setProgress((fetched / total) * 100)
@@ -315,18 +286,6 @@ export default function OrderPickingPage() {
           setLastFetched(new Date().toLocaleTimeString())
         }
 
-        const filteredForEnrichment = ordersList.filter((o) => isOrderInDateRange(o, startDate, endDate))
-        const needsLines = filteredForEnrichment.filter((o) => getOrderLines(o).length === 0)
-
-        if (needsLines.length > 0) {
-          setProgressText(`Loading items for ${needsLines.length} orders...`)
-          const enriched = await Promise.all(needsLines.map((o) => fetchOrderWithLines(o)))
-          const enrichedById = new Map(enriched.map((o) => [o.id, o]))
-          const merged = ordersList.map((o) => enrichedById.get(o.id) ?? o)
-          ordersList = merged
-          await setCachedOrders<BooqableOrder>(settings.businessSlug, merged)
-        }
-
         setRawOrders(ordersList)
         applyCurrentFilter(ordersList)
         setProgressText("")
@@ -337,7 +296,7 @@ export default function OrderPickingPage() {
         setIsLoading(false)
       }
     },
-    [applyCurrentFilter, fetchOrderWithLines, settings, endDate, startDate],
+    [applyCurrentFilter, settings, endDate, startDate],
   )
 
   useEffect(() => {
