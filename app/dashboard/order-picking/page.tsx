@@ -771,7 +771,7 @@ export default function OrderPickingPage() {
             </Button>
             {lastFetched && <span className="text-sm text-muted-foreground">Last fetched: {lastFetched}</span>}
           </div>
-          <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border border-border max-w-m w-full sm:w-auto">
+          <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border border-border max-w-md w-full sm:w-auto">
             <HelpCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
             <p className="text-xs leading-snug">Click items to mark them as picked, makes keeping track easy</p>
           </div>
