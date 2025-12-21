@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Progress } from "@/components/ui/progress"
 import { useSettings } from "@/lib/use-settings"
-import { BooqableApiError, fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
+import { fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
 import { deleteCachedValue, getCachedOrders, getCachedValue, setCachedOrders, setCachedValue } from "@/lib/orders-cache"
 import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon, HelpCircleIcon } from "@/components/icons"
 
@@ -133,7 +133,10 @@ function parseNumber(value: unknown): number {
 }
 
 function getOrderLines(order: BooqableOrder): BooqableLine[] {
-  return Array.isArray(order.lines) ? order.lines : []
+  if (Array.isArray(order.lines)) return order.lines
+  const maybeOrderLines = (order as Record<string, unknown>).order_lines
+  if (Array.isArray(maybeOrderLines)) return maybeOrderLines as BooqableLine[]
+  return []
 }
 
 function isOrderInDateRange(order: BooqableOrder, startDate: string, endDate: string): boolean {
@@ -239,33 +242,19 @@ export default function OrderPickingPage() {
 
       if (getOrderLines(order).length > 0) return order
 
-      const endpoints = [
-        `orders/${order.id}/lines`,
-        `orders/${order.id}?include=lines`,
-        `orders/${order.id}/order_lines`,
-        `orders/${order.id}?include=order_lines`,
-        `order_lines?order_id=${order.id}`,
-        `order_lines?filter[order_id]=${order.id}`,
-      ]
+      const endpoints = [`order_lines?filter[order_id]=${order.id}`, `order_lines?order_id=${order.id}`]
 
       for (const endpoint of endpoints) {
         try {
           const response = await fetchFromBooqableTenant<unknown>(endpoint, businessSlug, apiKey)
           const obj = (response ?? {}) as Record<string, unknown>
-          const candidate =
-            obj.lines ??
-            obj.order_lines ??
-            (Array.isArray(obj.data) ? obj.data : null) ??
-            (Array.isArray(obj.order_lines as unknown[]) ? (obj.order_lines as unknown[]) : null)
+          const candidate = obj.order_lines ?? obj.lines ?? (Array.isArray(obj.data) ? obj.data : null)
           const lines = Array.isArray(candidate) ? (candidate as BooqableLine[]) : []
           if (lines.length > 0) {
             return { ...order, lines }
           }
-        } catch (err) {
-          if (!(err instanceof BooqableApiError) || err.status !== 404) {
-            console.error("Failed to fetch lines for order", order.id, err)
-          }
-          continue
+        } catch {
+          // swallow and try next endpoint
         }
       }
 
