@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Progress } from "@/components/ui/progress"
 import { useSettings } from "@/lib/use-settings"
-import { fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
+import { BooqableApiError, fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
 import { deleteCachedValue, getCachedOrders, getCachedValue, setCachedOrders, setCachedValue } from "@/lib/orders-cache"
 import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon, HelpCircleIcon } from "@/components/icons"
 
@@ -239,15 +239,37 @@ export default function OrderPickingPage() {
 
       if (getOrderLines(order).length > 0) return order
 
-      try {
-        const response = await fetchFromBooqableTenant<unknown>(`orders/${order.id}/lines`, businessSlug, apiKey)
-        const obj = (response ?? {}) as Record<string, unknown>
-        const linesCandidate = obj.lines
-        const lines = Array.isArray(linesCandidate) ? (linesCandidate as BooqableLine[]) : []
-        return { ...order, lines }
-      } catch {
-        return order
+      const endpoints = [
+        `orders/${order.id}/lines`,
+        `orders/${order.id}?include=lines`,
+        `orders/${order.id}/order_lines`,
+        `orders/${order.id}?include=order_lines`,
+        `order_lines?order_id=${order.id}`,
+        `order_lines?filter[order_id]=${order.id}`,
+      ]
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetchFromBooqableTenant<unknown>(endpoint, businessSlug, apiKey)
+          const obj = (response ?? {}) as Record<string, unknown>
+          const candidate =
+            obj.lines ??
+            obj.order_lines ??
+            (Array.isArray(obj.data) ? obj.data : null) ??
+            (Array.isArray(obj.order_lines as unknown[]) ? (obj.order_lines as unknown[]) : null)
+          const lines = Array.isArray(candidate) ? (candidate as BooqableLine[]) : []
+          if (lines.length > 0) {
+            return { ...order, lines }
+          }
+        } catch (err) {
+          if (!(err instanceof BooqableApiError) || err.status !== 404) {
+            console.error("Failed to fetch lines for order", order.id, err)
+          }
+          continue
+        }
       }
+
+      return order
     },
     [settings?.apiKey, settings?.businessSlug],
   )
@@ -290,7 +312,7 @@ export default function OrderPickingPage() {
         }
 
         if (!ordersList || shouldRefresh) {
-          ordersList = await getAllPaginated<BooqableOrder>("orders", {
+          ordersList = await getAllPaginated<BooqableOrder>("orders?include=order_lines", {
             onProgress: (fetched, total) => {
               if (total) {
                 setProgress((fetched / total) * 100)
