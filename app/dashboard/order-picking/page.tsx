@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Progress } from "@/components/ui/progress"
 import { useSettings } from "@/lib/use-settings"
-import { fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
+import { BooqableApiError, fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
 import { deleteCachedValue, getCachedOrders, getCachedValue, setCachedOrders, setCachedValue } from "@/lib/orders-cache"
 import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon, HelpCircleIcon } from "@/components/icons"
 
@@ -148,16 +148,20 @@ function isOrderInDateRange(order: BooqableOrder, startDate: string, endDate: st
   return orderStart >= start && orderStart <= end
 }
 
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, "0")
+  const day = `${date.getDate()}`.padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 export default function OrderPickingPage() {
   const { settings } = useSettings()
-  const [startDate, setStartDate] = useState(() => {
-    const today = new Date()
-    return today.toISOString().split("T")[0]
-  })
+  const [startDate, setStartDate] = useState(() => formatLocalDate(new Date()))
   const [endDate, setEndDate] = useState(() => {
     const future = new Date()
     future.setDate(future.getDate() + 10)
-    return future.toISOString().split("T")[0]
+    return formatLocalDate(future)
   })
   const [sortByQuantity, setSortByQuantity] = useState(true)
   const [rawOrders, setRawOrders] = useState<BooqableOrder[]>([])
@@ -234,6 +238,37 @@ export default function OrderPickingPage() {
     [endDate, startDate],
   )
 
+  const fetchOrderWithLines = useCallback(
+    async (order: BooqableOrder): Promise<BooqableOrder> => {
+      const businessSlug = settings?.businessSlug
+      const apiKey = settings?.apiKey
+      if (!businessSlug || !apiKey) return order
+
+      if (getOrderLines(order).length > 0) return order
+
+      const endpoints = [`orders/${order.id}/lines`, `orders/${order.id}?include=lines`]
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetchFromBooqableTenant<unknown>(endpoint, businessSlug, apiKey)
+          const obj = (response ?? {}) as Record<string, unknown>
+          const candidate = obj.lines ?? obj.order_lines ?? (Array.isArray(obj.data) ? obj.data : null)
+          const lines = Array.isArray(candidate) ? (candidate as BooqableLine[]) : []
+          if (lines.length > 0) {
+            return { ...order, lines }
+          }
+        } catch (err) {
+          if (!(err instanceof BooqableApiError) || err.status !== 404) {
+            console.error("Failed to fetch lines for order", order.id, err)
+          }
+        }
+      }
+
+      return order
+    },
+    [settings?.apiKey, settings?.businessSlug],
+  )
+
   const loadOrders = useCallback(
     async ({ forceRefresh }: { forceRefresh: boolean }) => {
       setError(null)
@@ -257,8 +292,9 @@ export default function OrderPickingPage() {
         if (!forceRefresh) {
           const cached = await getCachedOrders<BooqableOrder>(settings.businessSlug)
           if (cached?.orders?.length) {
-            const fetchedAt = typeof cached.fetchedAt === "number" ? cached.fetchedAt : Date.now()
-            const cacheAge = Date.now() - fetchedAt
+            const fetchedAtMs =
+              typeof cached.fetchedAt === "number" ? cached.fetchedAt : Date.parse(cached.fetchedAt ?? "")
+            const cacheAge = Number.isFinite(fetchedAtMs) ? Date.now() - fetchedAtMs : Number.POSITIVE_INFINITY
             const twentyFourHours = 24 * 60 * 60 * 1000
 
             if (cacheAge > twentyFourHours) {
@@ -266,7 +302,9 @@ export default function OrderPickingPage() {
               shouldRefresh = true
             } else {
               ordersList = cached.orders
-              setLastFetched(new Date(fetchedAt).toLocaleTimeString())
+              if (Number.isFinite(fetchedAtMs)) {
+                setLastFetched(new Date(fetchedAtMs).toLocaleString())
+              }
             }
           }
         }
@@ -283,7 +321,18 @@ export default function OrderPickingPage() {
             },
           })
           await setCachedOrders<BooqableOrder>(settings.businessSlug, ordersList)
-          setLastFetched(new Date().toLocaleTimeString())
+          setLastFetched(new Date().toLocaleString())
+        }
+
+        const filteredForEnrichment = ordersList.filter((o) => isOrderInDateRange(o, startDate, endDate))
+        const needsLines = filteredForEnrichment.filter((o) => getOrderLines(o).length === 0)
+        if (needsLines.length > 0) {
+          setProgressText(`Loading items for ${needsLines.length} orders...`)
+          const enriched = await Promise.all(needsLines.map((o) => fetchOrderWithLines(o)))
+          const enrichedById = new Map(enriched.map((o) => [o.id, o]))
+          const merged = ordersList.map((o) => enrichedById.get(o.id) ?? o)
+          ordersList = merged
+          await setCachedOrders<BooqableOrder>(settings.businessSlug, merged)
         }
 
         setRawOrders(ordersList)
