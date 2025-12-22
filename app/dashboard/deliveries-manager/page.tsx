@@ -26,6 +26,51 @@ import {
 } from "@/components/icons"
 import Link from "next/link"
 
+function formatDateInput(date: Date): string {
+  return date.toISOString().split("T")[0]
+}
+
+function startOfWeek(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getDay() // 0 = Sunday
+  const diff = (day + 6) % 7 // make Monday start
+  d.setDate(d.getDate() - diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function endOfWeek(date: Date): Date {
+  const start = startOfWeek(date)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  end.setHours(23, 59, 59, 999)
+  return end
+}
+
+function startOfMonth(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), 1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function endOfMonth(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+
+function startOfYear(date: Date): Date {
+  const d = new Date(date.getFullYear(), 0, 1)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function endOfYear(date: Date): Date {
+  const d = new Date(date.getFullYear(), 11, 31)
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+
 
 const DRIVERS_STORAGE_KEY = "deliveryDriversList"
 const ASSIGNMENTS_STORAGE_KEY = "deliveryDriverAssignments"
@@ -76,13 +121,18 @@ export default function DeliveriesManagerPage() {
 
   const [startDate, setStartDate] = useState(() => {
     const today = new Date()
-    return today.toISOString().split("T")[0]
+    return formatDateInput(today)
   })
   const [endDate, setEndDate] = useState(() => {
     const future = new Date()
     future.setDate(future.getDate() + 30)
-    return future.toISOString().split("T")[0]
+    return formatDateInput(future)
   })
+
+  const applyRange = useCallback((range: { start: Date; end: Date }) => {
+    setStartDate(formatDateInput(range.start))
+    setEndDate(formatDateInput(range.end))
+  }, [])
 
   useEffect(() => {
     if (!settings?.businessSlug) return
@@ -291,6 +341,62 @@ export default function DeliveriesManagerPage() {
                   {isLoading ? <LoaderIcon className="h-4 w-4 mr-2 animate-spin" /> : <RefreshIcon className="h-4 w-4 mr-2" />}
                   Refresh Orders
                 </Button>
+              </div>
+              <div className="rounded-lg border border-border/60 p-2 bg-muted/30">
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    {
+                      title: "Days",
+                      presets: [
+                        { label: "Yesterday", calc: () => { const d = new Date(); d.setDate(d.getDate() - 1); const start = new Date(d); start.setHours(0,0,0,0); const end = new Date(d); end.setHours(23,59,59,999); return { start, end } } },
+                        { label: "Today", calc: () => { const d = new Date(); const start = new Date(d); start.setHours(0,0,0,0); const end = new Date(d); end.setHours(23,59,59,999); return { start, end } } },
+                        { label: "Tomorrow", calc: () => { const d = new Date(); d.setDate(d.getDate() + 1); const start = new Date(d); start.setHours(0,0,0,0); const end = new Date(d); end.setHours(23,59,59,999); return { start, end } } },
+                      ],
+                    },
+                    {
+                      title: "Weeks",
+                      presets: [
+                        { label: "Last Week", calc: () => { const today = new Date(); today.setDate(today.getDate() - 7); const start = startOfWeek(today); const end = endOfWeek(today); return { start, end } } },
+                        { label: "This Week", calc: () => { const start = startOfWeek(new Date()); const end = endOfWeek(new Date()); return { start, end } } },
+                        { label: "Next Week", calc: () => { const today = new Date(); today.setDate(today.getDate() + 7); const start = startOfWeek(today); const end = endOfWeek(today); return { start, end } } },
+                      ],
+                    },
+                    {
+                      title: "Months",
+                      presets: [
+                        { label: "Last Month", calc: () => { const today = new Date(); const start = startOfMonth(new Date(today.getFullYear(), today.getMonth() - 1, 1)); const end = endOfMonth(new Date(today.getFullYear(), today.getMonth() - 1, 1)); return { start, end } } },
+                        { label: "This Month", calc: () => { const start = startOfMonth(new Date()); const end = endOfMonth(new Date()); return { start, end } } },
+                        { label: "Next Month", calc: () => { const today = new Date(); const start = startOfMonth(new Date(today.getFullYear(), today.getMonth() + 1, 1)); const end = endOfMonth(new Date(today.getFullYear(), today.getMonth() + 1, 1)); return { start, end } } },
+                      ],
+                    },
+                    {
+                      title: "Years",
+                      presets: [
+                        { label: "Last Year", calc: () => { const today = new Date(); const start = startOfYear(new Date(today.getFullYear() - 1, 0, 1)); const end = endOfYear(new Date(today.getFullYear() - 1, 0, 1)); return { start, end } } },
+                        { label: "This Year", calc: () => { const start = startOfYear(new Date()); const end = endOfYear(new Date()); return { start, end } } },
+                        { label: "Next Year", calc: () => { const today = new Date(); const start = startOfYear(new Date(today.getFullYear() + 1, 0, 1)); const end = endOfYear(new Date(today.getFullYear() + 1, 0, 1)); return { start, end } } },
+                      ],
+                    },
+                  ].map((column, index) => (
+                    <div
+                      key={`preset-col-${column.title}`}
+                      className={`space-y-1 ${index > 0 ? "border-l border-border/60 pl-2" : ""}`}
+                    >
+                      <p className="text-[11px] font-semibold text-muted-foreground">{column.title}</p>
+                      {column.presets.map((preset) => (
+                        <Button
+                          key={preset.label}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-8 w-full transition-all hover:-translate-y-0.5"
+                          onClick={() => applyRange(preset.calc())}
+                        >
+                          {preset.label}
+                        </Button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
               {lastFetched && <p className="text-xs text-muted-foreground">Last fetched: {lastFetched}</p>}
             </CardContent>
