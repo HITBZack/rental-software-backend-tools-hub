@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { useSettings } from "@/lib/use-settings"
-import { getAllPaginated } from "@/lib/api"
-import { getCachedOrders, setCachedOrders, getCachedValue, setCachedValue } from "@/lib/orders-cache"
+import { useOrdersData } from "@/lib/use-orders-data"
+import type { BooqableOrder } from "@/lib/use-orders-data"
+import { getCachedValue, setCachedValue } from "@/lib/orders-cache"
 import {
   TruckIcon,
   RefreshIcon,
@@ -25,30 +26,6 @@ import {
 } from "@/components/icons"
 import Link from "next/link"
 
-type BooqableOrder = {
-  id: string
-  number?: string | number
-  starts_at?: string
-  stops_at?: string
-  status?: string
-  statuses?: string[]
-  item_count?: number
-  customer?: {
-    id?: string
-    name?: string
-    email?: string
-    properties_attributes?: {
-      cell_phone?: string
-      [key: string]: unknown
-    }
-    [key: string]: unknown
-  }
-  properties_attributes?: {
-    notes?: string
-    [key: string]: unknown
-  }
-  [key: string]: unknown
-}
 
 const DRIVERS_STORAGE_KEY = "deliveryDriversList"
 const ASSIGNMENTS_STORAGE_KEY = "deliveryDriverAssignments"
@@ -88,13 +65,8 @@ function formatDate(dt: string | undefined): string {
 
 export default function DeliveriesManagerPage() {
   const { settings } = useSettings()
-  const [orders, setOrders] = useState<BooqableOrder[]>([])
+  const { orders, isLoading, error, lastFetched, progress, progressText, refreshOrders } = useOrdersData()
   const [filteredOrders, setFilteredOrders] = useState<BooqableOrder[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [progressText, setProgressText] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [lastFetched, setLastFetched] = useState<string | null>(null)
 
   const [drivers, setDrivers] = useState<string[]>([])
   const [newDriverName, setNewDriverName] = useState("")
@@ -241,65 +213,6 @@ export default function DeliveriesManagerPage() {
     }
   }
 
-  const loadOrders = useCallback(
-    async ({ forceRefresh }: { forceRefresh: boolean }) => {
-      setError(null)
-      setProgress(0)
-      setProgressText("")
-
-      if (!settings) {
-        setError("Settings not loaded")
-        return
-      }
-      if (!settings.apiKey || !settings.businessSlug) {
-        setError("Missing API key or business slug. Please configure your settings first.")
-        return
-      }
-
-      setIsLoading(true)
-      try {
-        let ordersList: BooqableOrder[] | null = null
-
-        if (!forceRefresh) {
-          const cached = await getCachedOrders<BooqableOrder>(settings.businessSlug)
-          if (cached?.orders?.length) {
-            ordersList = cached.orders
-            setLastFetched(new Date(cached.fetchedAt).toLocaleTimeString())
-          }
-        }
-
-        if (!ordersList) {
-          ordersList = await getAllPaginated<BooqableOrder>("orders", {
-            onProgress: (fetched, total) => {
-              if (total) {
-                setProgress((fetched / total) * 100)
-                setProgressText(`Fetched ${fetched} of ${total} orders...`)
-              } else {
-                setProgressText(`Fetched ${fetched} orders...`)
-              }
-            },
-          })
-          await setCachedOrders<BooqableOrder>(settings.businessSlug, ordersList)
-          setLastFetched(new Date().toLocaleTimeString())
-        }
-
-        setOrders(ordersList)
-        setProgressText("")
-        setProgress(0)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load orders")
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [settings],
-  )
-
-  useEffect(() => {
-    if (!settings?.businessSlug) return
-    void loadOrders({ forceRefresh: false })
-  }, [loadOrders, settings?.businessSlug])
-
   useEffect(() => {
     const start = new Date(`${startDate}T00:00:00`)
     const end = new Date(`${endDate}T23:59:59`)
@@ -322,7 +235,7 @@ export default function DeliveriesManagerPage() {
   }, [orders, startDate, endDate])
 
   const handleRefresh = async () => {
-    await loadOrders({ forceRefresh: true })
+    await refreshOrders()
   }
 
   return (

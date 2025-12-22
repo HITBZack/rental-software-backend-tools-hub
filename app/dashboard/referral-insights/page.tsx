@@ -1112,7 +1112,7 @@ export default function ReferralInsightsPage() {
         {totalOrders > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
             <Card className="bg-pastel-lavender/20">
-              <CardContent className="pt-6">
+              <CardContent className="pt-2">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-lg bg-pastel-lavender flex items-center justify-center">
                     <UsersIcon className="h-5 w-5 text-foreground" />
@@ -1126,7 +1126,7 @@ export default function ReferralInsightsPage() {
             </Card>
 
             <Card className="bg-pastel-mint/20">
-              <CardContent className="pt-6">
+              <CardContent className="pt-2">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-lg bg-pastel-mint flex items-center justify-center">
                     <TrendingUpIcon className="h-5 w-5 text-foreground" />
@@ -1140,7 +1140,7 @@ export default function ReferralInsightsPage() {
             </Card>
 
             <Card className="bg-pastel-peach/20">
-              <CardContent className="pt-6">
+              <CardContent className="pt-2">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-lg bg-pastel-peach flex items-center justify-center">
                     <PieChartIcon className="h-5 w-5 text-foreground" />

@@ -10,10 +10,9 @@ import { Switch } from "@/components/ui/switch"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Progress } from "@/components/ui/progress"
 import { useSettings } from "@/lib/use-settings"
-import { useOrdersData } from "@/lib/use-orders-data"
-import type { BooqableOrder } from "@/lib/use-orders-data"
-import { deleteCachedValue, getCachedValue, setCachedValue } from "@/lib/orders-cache"
-import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon, HelpCircleIcon } from "@/components/icons"
+import { fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
+import { deleteCachedValue, getCachedOrders, getCachedValue, setCachedOrders, setCachedValue } from "@/lib/orders-cache"
+import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon } from "@/components/icons"
 
 interface OrderItem {
   id: string
@@ -37,6 +36,18 @@ type BooqableLine = {
   quantity_as_decimal?: string
   item_id?: string
   product_id?: string
+  [key: string]: unknown
+}
+
+type BooqableOrder = {
+  id: string
+  number?: string | number
+  starts_at?: string
+  stops_at?: string
+  status?: string
+  statuses?: string[]
+  lines?: BooqableLine[]
+  item_count?: number
   [key: string]: unknown
 }
 
@@ -113,18 +124,16 @@ function buildDateRange(order: BooqableOrder): string {
 }
 
 function parseNumber(value: unknown): number {
-  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value
+  if (typeof value === "number" && Number.isFinite(value)) return value
   if (typeof value === "string") {
     const n = Number.parseFloat(value)
-    if (Number.isFinite(n) && n > 0) return n
+    if (Number.isFinite(n)) return n
   }
-  return 1
+  return 0
 }
 
 function getOrderLines(order: BooqableOrder): BooqableLine[] {
-  if (Array.isArray(order.lines)) return order.lines
-  if (Array.isArray(order.order_lines)) return order.order_lines as BooqableLine[]
-  return []
+  return Array.isArray(order.lines) ? order.lines : []
 }
 
 function isOrderInDateRange(order: BooqableOrder, startDate: string, endDate: string): boolean {
@@ -136,34 +145,32 @@ function isOrderInDateRange(order: BooqableOrder, startDate: string, endDate: st
   return orderStart >= start && orderStart <= end
 }
 
-function formatLocalDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, "0")
-  const day = `${date.getDate()}`.padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
 export default function OrderPickingPage() {
   const { settings } = useSettings()
-  const { orders: rawOrders, isLoading, error, lastFetched, progress, progressText, refreshOrders } = useOrdersData()
-  const [startDate, setStartDate] = useState(() => formatLocalDate(new Date()))
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date()
+    return today.toISOString().split("T")[0]
+  })
   const [endDate, setEndDate] = useState(() => {
     const future = new Date()
     future.setDate(future.getDate() + 10)
-    return formatLocalDate(future)
+    return future.toISOString().split("T")[0]
   })
   const [sortByQuantity, setSortByQuantity] = useState(true)
+  const [rawOrders, setRawOrders] = useState<BooqableOrder[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [lastFetched, setLastFetched] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [progressText, setProgressText] = useState("")
+  const [error, setError] = useState<string | null>(null)
   const [combineAll, setCombineAll] = useState(false)
-  const [combineSameDays, setCombineSameDays] = useState(false)
   const [showImages, setShowImages] = useState(false)
   const [itemPhotosMap, setItemPhotosMap] = useState<ItemPhotoMap | null>(null)
   const [imageBuildProgress, setImageBuildProgress] = useState(0)
   const [imageBuildText, setImageBuildText] = useState("")
   const [imageBuildError, setImageBuildError] = useState<string | null>(null)
-  const [isImageBuilding, setIsImageBuilding] = useState(false)
   const [localImageUrls, setLocalImageUrls] = useState<Record<string, string>>({})
-  const [showImagePanel, setShowImagePanel] = useState(false)
   const localImageUrlsRef = useRef<Record<string, string>>({})
   useEffect(() => {
     localImageUrlsRef.current = localImageUrls
@@ -190,63 +197,132 @@ export default function OrderPickingPage() {
   const applyCurrentFilter = useCallback(
     (sourceOrders: BooqableOrder[]) => {
       const filtered = sourceOrders.filter((o) => isOrderInDateRange(o, startDate, endDate))
-      const sorted = [...filtered].sort((a, b) => {
-        const aDate = new Date(a.starts_at ?? 0).getTime()
-        const bDate = new Date(b.starts_at ?? 0).getTime()
-        if (Number.isNaN(aDate) && Number.isNaN(bDate)) return 0
-        if (Number.isNaN(aDate)) return 1
-        if (Number.isNaN(bDate)) return -1
-        return aDate - bDate
-      })
-      const uiOrders: Order[] = sorted.map((o) => {
-        const dateRange = buildDateRange(o)
-        const lines = getOrderLines(o)
-        let items = lines
-          .map((l) => {
-            const id = l.id ?? `${o.id}:${String(l.item_id ?? l.title ?? "line")}`
-            const name = (typeof l.title === "string" && l.title.trim().length > 0 ? l.title : "Item")
-            const qty = parseNumber(l.quantity ?? l.quantity_as_decimal)
-            const pickedKey = `${o.id}:${id}`
-            const booqableItemId = typeof l.item_id === "string" ? l.item_id : undefined
-            return {
-              id,
-              name,
-              quantity: qty,
-              booqableItemId,
-              picked: pickedKeysRef.current.has(pickedKey),
-            }
-          })
-          .filter((i) => i.quantity > 0)
+      const uiOrders: Order[] = filtered
+        .map((o) => {
+          const dateRange = buildDateRange(o)
+          const lines = getOrderLines(o)
+          const items = lines
+            .map((l) => {
+              const id = l.id ?? `${o.id}:${String(l.item_id ?? l.title ?? "line")}`
+              const name = (typeof l.title === "string" && l.title.trim().length > 0 ? l.title : "Item")
+              const qty = parseNumber(l.quantity ?? l.quantity_as_decimal)
+              const pickedKey = `${o.id}:${id}`
+              const booqableItemId = typeof l.item_id === "string" ? l.item_id : undefined
+              return {
+                id,
+                name,
+                quantity: qty,
+                booqableItemId,
+                picked: pickedKeysRef.current.has(pickedKey),
+              }
+            })
+            .filter((i) => i.quantity > 0)
 
-        if (items.length === 0) {
-          const fallbackQty =
-            typeof o.item_count === "number" && Number.isFinite(o.item_count) && o.item_count > 0 ? o.item_count : 1
-          items = [
-            {
-              id: `${o.id}:placeholder`,
-              name: "Items not loaded yet",
-              quantity: fallbackQty,
-              booqableItemId: undefined,
-              picked: false,
-            },
-          ]
-        }
-
-        return {
-          id: o.id,
-          dateRange,
-          items,
-        }
-      })
+          return {
+            id: o.id,
+            dateRange,
+            items,
+          }
+        })
+        .filter((o) => o.items.length > 0)
 
       setOrders(uiOrders)
     },
     [endDate, startDate],
   )
 
+  const fetchOrderWithLines = useCallback(
+    async (order: BooqableOrder): Promise<BooqableOrder> => {
+      const businessSlug = settings?.businessSlug
+      const apiKey = settings?.apiKey
+      if (!businessSlug || !apiKey) return order
+
+      if (getOrderLines(order).length > 0) return order
+
+      try {
+        const response = await fetchFromBooqableTenant<unknown>(`orders/${order.id}/lines`, businessSlug, apiKey)
+        const obj = (response ?? {}) as Record<string, unknown>
+        const linesCandidate = obj.lines
+        const lines = Array.isArray(linesCandidate) ? (linesCandidate as BooqableLine[]) : []
+        return { ...order, lines }
+      } catch {
+        return order
+      }
+    },
+    [settings?.apiKey, settings?.businessSlug],
+  )
+
+  const loadOrders = useCallback(
+    async ({ forceRefresh }: { forceRefresh: boolean }) => {
+      setError(null)
+      setProgress(0)
+      setProgressText("")
+
+      if (!settings) {
+        setError("Settings not loaded")
+        return
+      }
+      if (!settings.apiKey || !settings.businessSlug) {
+        setError("Missing API key or business slug. Please configure your settings first.")
+        return
+      }
+
+      setIsLoading(true)
+      try {
+        let ordersList: BooqableOrder[] | null = null
+
+        if (!forceRefresh) {
+          const cached = await getCachedOrders<BooqableOrder>(settings.businessSlug)
+          if (cached?.orders?.length) {
+            ordersList = cached.orders
+            setLastFetched(new Date(cached.fetchedAt).toLocaleTimeString())
+          }
+        }
+
+        if (!ordersList) {
+          ordersList = await getAllPaginated<BooqableOrder>("orders", {
+            onProgress: (fetched, total) => {
+              if (total) {
+                setProgress((fetched / total) * 100)
+                setProgressText(`Fetched ${fetched} of ${total} orders...`)
+              } else {
+                setProgressText(`Fetched ${fetched} orders...`)
+              }
+            },
+          })
+          await setCachedOrders<BooqableOrder>(settings.businessSlug, ordersList)
+          setLastFetched(new Date().toLocaleTimeString())
+        }
+
+        const filteredForEnrichment = ordersList.filter((o) => isOrderInDateRange(o, startDate, endDate))
+        const needsLines = filteredForEnrichment.filter((o) => getOrderLines(o).length === 0)
+
+        if (needsLines.length > 0) {
+          setProgressText(`Loading items for ${needsLines.length} orders...`)
+          const enriched = await Promise.all(needsLines.map((o) => fetchOrderWithLines(o)))
+          const enrichedById = new Map(enriched.map((o) => [o.id, o]))
+          const merged = ordersList.map((o) => enrichedById.get(o.id) ?? o)
+          ordersList = merged
+          await setCachedOrders<BooqableOrder>(settings.businessSlug, merged)
+        }
+
+        setRawOrders(ordersList)
+        applyCurrentFilter(ordersList)
+        setProgressText("")
+        setProgress(0)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load orders")
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [applyCurrentFilter, fetchOrderWithLines, settings, endDate, startDate],
+  )
+
   useEffect(() => {
-    applyCurrentFilter(rawOrders)
-  }, [applyCurrentFilter, rawOrders, startDate, endDate])
+    if (!settings?.businessSlug) return
+    void loadOrders({ forceRefresh: false })
+  }, [loadOrders, settings?.businessSlug])
 
   useEffect(() => {
     if (!settings?.businessSlug) return
@@ -281,7 +357,7 @@ export default function OrderPickingPage() {
   }, [])
 
   const handleRefresh = async () => {
-    await refreshOrders()
+    await loadOrders({ forceRefresh: true })
   }
 
   const handleApplyFilter = () => {
@@ -337,33 +413,6 @@ export default function OrderPickingPage() {
     return items
   }
 
-  const getCombinedByDate = () => {
-    const byDate: Record<string, { dateRange: string; items: Record<string, OrderItem> }> = {}
-    
-    orders.forEach((order) => {
-      const dateKey = order.dateRange
-      if (!byDate[dateKey]) {
-        byDate[dateKey] = { dateRange: order.dateRange, items: {} }
-      }
-      
-      order.items.forEach((item) => {
-        if (byDate[dateKey].items[item.name]) {
-          byDate[dateKey].items[item.name].quantity += item.quantity
-        } else {
-          byDate[dateKey].items[item.name] = { ...item }
-        }
-      })
-    })
-    
-    return Object.values(byDate).map((group) => {
-      let items = Object.values(group.items)
-      if (sortByQuantity) {
-        items = items.sort((a, b) => b.quantity - a.quantity)
-      }
-      return { dateRange: group.dateRange, items }
-    })
-  }
-
   const sortedOrders = useMemo(() => {
     return sortByQuantity
       ? orders.map((order) => ({
@@ -408,7 +457,7 @@ export default function OrderPickingPage() {
       return
     }
 
-    setIsImageBuilding(true)
+    setIsLoading(true)
     try {
       const slug = settings.businessSlug.trim().toLowerCase().replace(/\s+/g, "-")
       const baseUrl = `https://${slug}.booqable.com/api/4/items`
@@ -514,7 +563,7 @@ export default function OrderPickingPage() {
     } catch (e) {
       setImageBuildError(e instanceof Error ? e.message : "Failed to build image cache")
     } finally {
-      setIsImageBuilding(false)
+      setIsLoading(false)
     }
   }, [settings])
 
@@ -640,38 +689,23 @@ export default function OrderPickingPage() {
               <Button onClick={handleApplyFilter} className="bg-pastel-blue hover:bg-pastel-blue/80 text-foreground">
                 Apply Filter
               </Button>
-              <div className="ml-auto">
-                <Button
-                  onClick={() => setShowImagePanel(!showImagePanel)}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                >
-                  {showImagePanel ? "Hide" : "Show"} Product Images
-                </Button>
-              </div>
             </div>
           </CardContent>
         </Card>
 
-        <div
-          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            showImagePanel ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-          }`}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Product images (optional)</CardTitle>
-              <CardDescription>
-                You can use the tool without images. Building an image cache can take time and store many images in your browser storage.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Product images (optional)</CardTitle>
+            <CardDescription>
+              You can use the tool without images. Building an image cache can take time and store many images in your browser storage.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={buildItemPhotoMapAndDownload} disabled={isLoading || isImageBuilding} variant="secondary">
+              <Button onClick={buildItemPhotoMapAndDownload} disabled={isLoading} variant="secondary">
                 Build local image cache
               </Button>
-              <Button onClick={clearImageCache} disabled={isLoading || isImageBuilding || !itemPhotosMap} variant="ghost">
+              <Button onClick={clearImageCache} disabled={isLoading || !itemPhotosMap} variant="ghost">
                 Clear image cache
               </Button>
               <div className="flex items-center gap-2">
@@ -691,7 +725,6 @@ export default function OrderPickingPage() {
             {imageBuildError && <p className="text-sm text-destructive">{imageBuildError}</p>}
           </CardContent>
         </Card>
-        </div>
 
         {error && (
           <Card className="border-destructive/40 bg-destructive/5">
@@ -702,49 +735,30 @@ export default function OrderPickingPage() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3 justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className="bg-pastel-mint hover:bg-pastel-mint/80 text-foreground"
-            >
-              {isLoading ? (
-                <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshIcon className="h-4 w-4 mr-2" />
-              )}
-              Refresh Orders
-            </Button>
-            <Button
-              onClick={() => {
-                setCombineSameDays(!combineSameDays)
-                if (!combineSameDays) setCombineAll(false)
-              }}
-              variant={combineSameDays ? "default" : "secondary"}
-              className={combineSameDays ? "bg-foreground text-background" : ""}
-            >
-              {combineSameDays ? "Show by Order" : "Combine Same Days"}
-            </Button>
-            <Button
-              onClick={() => {
-                setCombineAll(!combineAll)
-                if (!combineAll) setCombineSameDays(false)
-              }}
-              variant={combineAll ? "default" : "secondary"}
-              className={combineAll ? "bg-foreground text-background" : ""}
-            >
-              {combineAll ? "Show by Date" : "Combine All Days"}
-            </Button>
-            <Button onClick={unpickAll} variant="secondary">
-              Unpick All
-            </Button>
-            {lastFetched && <span className="text-sm text-muted-foreground">Last fetched: {lastFetched}</span>}
-          </div>
-          <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/30 px-3 py-2 rounded-lg border border-border max-w-md w-full sm:w-auto">
-            <HelpCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
-            <p className="text-xs leading-snug">Click items to mark them as picked, makes keeping track easy</p>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="bg-pastel-mint hover:bg-pastel-mint/80 text-foreground"
+          >
+            {isLoading ? (
+              <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshIcon className="h-4 w-4 mr-2" />
+            )}
+            Refresh Orders
+          </Button>
+          <Button
+            onClick={() => setCombineAll(!combineAll)}
+            variant={combineAll ? "default" : "secondary"}
+            className={combineAll ? "bg-foreground text-background" : ""}
+          >
+            {combineAll ? "Show by Date" : "Combine All Days"}
+          </Button>
+          <Button onClick={unpickAll} variant="secondary">
+            Unpick All
+          </Button>
+          {lastFetched && <span className="text-sm text-muted-foreground">Last fetched: {lastFetched}</span>}
         </div>
 
         {isLoading && (
@@ -789,45 +803,6 @@ export default function OrderPickingPage() {
               </div>
             </CardContent>
           </Card>
-        ) : combineSameDays ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {getCombinedByDate().map((dateGroup) => (
-              <Card key={dateGroup.dateRange} className="overflow-hidden">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-medium text-pastel-lavender flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    {dateGroup.dateRange}
-                  </CardTitle>
-                  <CardDescription>{dateGroup.items.length} unique items</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {dateGroup.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 p-2 rounded-lg border transition-all ${
-                        item.picked
-                          ? "bg-pastel-mint/20 border-pastel-mint"
-                          : "bg-card border-border hover:border-pastel-lavender/50"
-                      }`}
-                    >
-                      {showImages && (
-                        <img
-                          src={(item.booqableItemId && localImageUrls[item.booqableItemId]) || "/placeholder.svg"}
-                          alt={item.name}
-                          className="w-12 h-12 rounded-lg object-cover bg-muted"
-                        />
-                      )}
-                      <Checkbox checked={item.picked} onCheckedChange={() => toggleCombinedItemByName(item.name, item.picked)} />
-                      <span className={`flex-1 ${item.picked ? "line-through text-muted-foreground" : ""}`}>
-                        {item.name}
-                      </span>
-                      <span className="text-lg font-semibold text-muted-foreground">{item.quantity}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedOrders.map((order) => (

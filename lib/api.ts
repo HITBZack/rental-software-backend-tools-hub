@@ -88,6 +88,18 @@ export async function fetchFromBooqableTenant<T>(endpoint: string, businessSlug:
   return response.json()
 }
 
+// Transform JSON:API format to flat structure
+function flattenJsonApiResource(resource: Record<string, unknown>): Record<string, unknown> {
+  const { id, type, attributes, relationships, ...rest } = resource
+  return {
+    id,
+    type,
+    ...((attributes ?? {}) as Record<string, unknown>),
+    relationships, // Keep relationships for later merging
+    ...rest,
+  }
+}
+
 export async function getAllPaginated<T>(endpoint: string, options: FetchOptions = {}): Promise<T[]> {
   const settings = getSettings()
   const {
@@ -115,6 +127,7 @@ export async function getAllPaginated<T>(endpoint: string, options: FetchOptions
   let totalCount: number | null = null
   const seenIds = new Set<string>()
   let paginationMode: "jsonapi" | "legacy" = paginationModeFromOptions ?? "legacy"
+  const allIncluded: Record<string, unknown>[] = []
 
   const collectionKey = endpoint
     .split("?")[0]
@@ -163,7 +176,11 @@ export async function getAllPaginated<T>(endpoint: string, options: FetchOptions
     }
     const responseObj = (response ?? {}) as Record<string, unknown>
 
-    const pageItems =
+    // Extract included resources (for JSON:API includes like order_lines)
+    const included = Array.isArray(responseObj.included) ? responseObj.included : []
+    allIncluded.push(...included)
+
+    let pageItems =
       (Array.isArray((responseObj as PaginatedResponse<T>).data) ? ((responseObj as PaginatedResponse<T>).data as T[]) : null) ??
       (collectionKey && Array.isArray(responseObj[collectionKey]) ? (responseObj[collectionKey] as T[]) : null)
 
@@ -176,6 +193,14 @@ export async function getAllPaginated<T>(endpoint: string, options: FetchOptions
       }
       hasMore = false
       continue
+    }
+
+    // Flatten JSON:API structure to simple objects
+    if (pageItems.length > 0 && typeof pageItems[0] === "object" && pageItems[0] !== null) {
+      const first = pageItems[0] as Record<string, unknown>
+      if ("attributes" in first || "relationships" in first) {
+        pageItems = pageItems.map((item) => flattenJsonApiResource(item as Record<string, unknown>) as T)
+      }
     }
 
     const metaObj = (responseObj.meta ?? {}) as Record<string, unknown>
@@ -228,7 +253,95 @@ export async function getAllPaginated<T>(endpoint: string, options: FetchOptions
     await sleep(sleepDelay)
   }
 
+  // Merge included resources back into main results for JSON:API responses
+  if (allIncluded.length > 0 && allResults.length > 0) {
+    console.log("=== API MERGE DEBUG ===")
+    console.log("Total included resources:", allIncluded.length)
+    console.log("Included types:", [...new Set(allIncluded.map(i => (i as any).type))])
+    
+    const includedByTypeAndId = new Map<string, Record<string, unknown>>()
+    for (const inc of allIncluded) {
+      const incObj = inc as Record<string, unknown>
+      const incType = incObj.type as string | undefined
+      const incId = incObj.id as string | undefined
+      if (incType && incId) {
+        includedByTypeAndId.set(`${incType}:${incId}`, flattenJsonApiResource(incObj))
+      }
+    }
+
+    // Attach included resources to orders based on relationships
+    for (const result of allResults) {
+      const resultObj = result as Record<string, unknown>
+      const relationships = resultObj.relationships as Record<string, unknown> | undefined
+      
+      if (relationships) {
+        // Merge order_lines
+        if (relationships.order_lines) {
+          const orderLinesRel = relationships.order_lines as Record<string, unknown>
+          const orderLinesData = orderLinesRel.data
+          if (Array.isArray(orderLinesData)) {
+            const lines: Record<string, unknown>[] = []
+            for (const ref of orderLinesData) {
+              const refObj = ref as Record<string, unknown>
+              const refType = refObj.type as string | undefined
+              const refId = refObj.id as string | undefined
+              if (refType && refId) {
+                const included = includedByTypeAndId.get(`${refType}:${refId}`)
+                if (included) {
+                  lines.push(included)
+                }
+              }
+            }
+            resultObj.order_lines = lines
+            resultObj.lines = lines
+          }
+        }
+        
+        // Merge customer
+        if (relationships.customer) {
+          const customerRel = relationships.customer as Record<string, unknown>
+          const customerData = customerRel.data as Record<string, unknown> | undefined
+          if (customerData) {
+            const customerType = customerData.type as string | undefined
+            const customerId = customerData.id as string | undefined
+            if (customerType && customerId) {
+              const customer = includedByTypeAndId.get(`${customerType}:${customerId}`)
+              if (customer) {
+                resultObj.customer = customer
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    console.log("First order after merge:", allResults[0])
+    console.log("=======================")
+  }
+
   return allResults
+}
+
+// Fetch a single order from API v4 with includes (for enriching with lines)
+export async function fetchOrderWithLinesV4(orderId: string, businessSlug: string, apiKey: string): Promise<unknown> {
+  const slug = normalizeSlug(businessSlug)
+  const cleanApiKey = normalizeApiKey(apiKey)
+  const url = `https://${slug}.booqable.com/api/4/orders/${orderId}?include=lines.item`
+
+  const response = await fetchWithTimeout(url, {
+    headers: {
+      Accept: "application/vnd.api+json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${cleanApiKey}`,
+    },
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new BooqableApiError(`Failed to fetch order ${orderId}: ${response.status} - ${errorText}`, response.status)
+  }
+
+  return response.json()
 }
 
 export async function testApiConnection(apiKey: string, businessSlug: string): Promise<boolean> {
