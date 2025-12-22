@@ -5,11 +5,13 @@ type CachedValue<T> = {
   fetchedAt: string
   businessSlug: string
   value: T
+  cacheVersion?: number
 }
 
 const DB_NAME = 'booqable-helper-cache'
-const DB_VERSION = 1
+const DB_VERSION = 2
 const STORE_NAME = 'cache'
+const CACHE_VERSION = 2
 
 function normalizeBusinessSlug(value: string): string {
   return value.trim().toLowerCase()
@@ -79,6 +81,10 @@ export async function getCachedOrders<T>(businessSlug: string): Promise<{ fetche
   const record = await getCachedValue<T[]>(buildOrdersCacheKey(businessSlug))
   if (!record) return null
   if (normalizeBusinessSlug(record.businessSlug) !== normalizeBusinessSlug(businessSlug)) return null
+  if (record.cacheVersion !== CACHE_VERSION) {
+    await clearCachedOrders(businessSlug)
+    return null
+  }
   return { fetchedAt: record.fetchedAt, orders: record.value }
 }
 
@@ -89,6 +95,7 @@ export async function setCachedOrders<T>(businessSlug: string, orders: T[]): Pro
     fetchedAt: new Date().toISOString(),
     businessSlug: normalizeBusinessSlug(businessSlug),
     value: orders,
+    cacheVersion: CACHE_VERSION,
   })
 }
 
