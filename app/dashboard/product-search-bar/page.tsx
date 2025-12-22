@@ -282,6 +282,20 @@ export default function ProductSearchBarPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="rounded-xl border bg-muted/40 p-3">
+                    <video
+                      className="w-full rounded-lg border shadow-sm"
+                      src="/videos/FuzzySearch_ShowcaseVideo.mp4"
+                      autoPlay
+                      muted
+                      loop
+                      controls
+                      preload="metadata"
+                      playsInline
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="p-4 rounded-lg bg-pastel-lavender/20 border border-pastel-lavender/30">
                       <FileJsonIcon className="h-6 w-6 text-foreground mb-2" />
