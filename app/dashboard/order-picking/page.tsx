@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Progress } from "@/components/ui/progress"
 import { useSettings } from "@/lib/use-settings"
-import { BooqableApiError, fetchFromBooqableTenant, getAllPaginated } from "@/lib/api"
+import { getAllPaginated } from "@/lib/api"
 import { deleteCachedValue, getCachedOrders, getCachedValue, setCachedOrders, setCachedValue } from "@/lib/orders-cache"
 import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon, HelpCircleIcon } from "@/components/icons"
 
@@ -238,37 +238,6 @@ export default function OrderPickingPage() {
     [endDate, startDate],
   )
 
-  const fetchOrderWithLines = useCallback(
-    async (order: BooqableOrder): Promise<BooqableOrder> => {
-      const businessSlug = settings?.businessSlug
-      const apiKey = settings?.apiKey
-      if (!businessSlug || !apiKey) return order
-
-      if (getOrderLines(order).length > 0) return order
-
-      const endpoints = [`orders/${order.id}/lines`, `orders/${order.id}?include=lines`]
-
-      for (const endpoint of endpoints) {
-        try {
-          const response = await fetchFromBooqableTenant<unknown>(endpoint, businessSlug, apiKey)
-          const obj = (response ?? {}) as Record<string, unknown>
-          const candidate = obj.lines ?? obj.order_lines ?? (Array.isArray(obj.data) ? obj.data : null)
-          const lines = Array.isArray(candidate) ? (candidate as BooqableLine[]) : []
-          if (lines.length > 0) {
-            return { ...order, lines }
-          }
-        } catch (err) {
-          if (!(err instanceof BooqableApiError) || err.status !== 404) {
-            console.error("Failed to fetch lines for order", order.id, err)
-          }
-        }
-      }
-
-      return order
-    },
-    [settings?.apiKey, settings?.businessSlug],
-  )
-
   const loadOrders = useCallback(
     async ({ forceRefresh }: { forceRefresh: boolean }) => {
       setError(null)
@@ -292,8 +261,7 @@ export default function OrderPickingPage() {
         if (!forceRefresh) {
           const cached = await getCachedOrders<BooqableOrder>(settings.businessSlug)
           if (cached?.orders?.length) {
-            const fetchedAtMs =
-              typeof cached.fetchedAt === "number" ? cached.fetchedAt : Date.parse(cached.fetchedAt ?? "")
+            const fetchedAtMs = typeof cached.fetchedAt === "number" ? cached.fetchedAt : Date.parse(cached.fetchedAt ?? "")
             const cacheAge = Number.isFinite(fetchedAtMs) ? Date.now() - fetchedAtMs : Number.POSITIVE_INFINITY
             const twentyFourHours = 24 * 60 * 60 * 1000
 
@@ -302,7 +270,7 @@ export default function OrderPickingPage() {
               shouldRefresh = true
             } else {
               ordersList = cached.orders
-              if (Number.isFinite(fetchedAtMs)) {
+              if (Number.isFinite(fetchedAtMs) && fetchedAtMs > 0) {
                 setLastFetched(new Date(fetchedAtMs).toLocaleString())
               }
             }
@@ -310,7 +278,7 @@ export default function OrderPickingPage() {
         }
 
         if (!ordersList || shouldRefresh) {
-          ordersList = await getAllPaginated<BooqableOrder>("orders?include=lines", {
+          ordersList = await getAllPaginated<BooqableOrder>("orders?include=order_lines", {
             onProgress: (fetched, total) => {
               if (total) {
                 setProgress((fetched / total) * 100)
@@ -324,17 +292,6 @@ export default function OrderPickingPage() {
           setLastFetched(new Date().toLocaleString())
         }
 
-        const filteredForEnrichment = ordersList.filter((o) => isOrderInDateRange(o, startDate, endDate))
-        const needsLines = filteredForEnrichment.filter((o) => getOrderLines(o).length === 0)
-        if (needsLines.length > 0) {
-          setProgressText(`Loading items for ${needsLines.length} orders...`)
-          const enriched = await Promise.all(needsLines.map((o) => fetchOrderWithLines(o)))
-          const enrichedById = new Map(enriched.map((o) => [o.id, o]))
-          const merged = ordersList.map((o) => enrichedById.get(o.id) ?? o)
-          ordersList = merged
-          await setCachedOrders<BooqableOrder>(settings.businessSlug, merged)
-        }
-
         setRawOrders(ordersList)
         applyCurrentFilter(ordersList)
         setProgressText("")
@@ -345,13 +302,17 @@ export default function OrderPickingPage() {
         setIsLoading(false)
       }
     },
-    [applyCurrentFilter, settings, endDate, startDate],
+    [settings],
   )
 
   useEffect(() => {
     if (!settings?.businessSlug) return
     void loadOrders({ forceRefresh: false })
   }, [loadOrders, settings?.businessSlug])
+
+  useEffect(() => {
+    applyCurrentFilter(rawOrders)
+  }, [applyCurrentFilter, rawOrders, startDate, endDate])
 
   useEffect(() => {
     if (!settings?.businessSlug) return
