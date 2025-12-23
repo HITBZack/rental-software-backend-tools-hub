@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { WaveMarquee } from "@/components/wave-marquee"
 import { Progress } from "@/components/ui/progress"
 import { useSettings } from "@/lib/use-settings"
@@ -14,6 +15,13 @@ import { useOrdersData } from "@/lib/use-orders-data"
 import type { BooqableOrder } from "@/lib/use-orders-data"
 import { deleteCachedValue, getCachedValue, setCachedValue } from "@/lib/orders-cache"
 import { RefreshIcon, LoaderIcon, CalendarIcon, PackageIcon, FilterIcon, HelpCircleIcon } from "@/components/icons"
+import {
+  getOrderPickingCustomItemRules,
+  normalizeRuleInput,
+  orderMatchesRule,
+  saveOrderPickingCustomItemRules,
+  type OrderPickingCustomItemRule,
+} from "@/lib/order-picking-custom-item-rules"
 
 interface OrderItem {
   id: string
@@ -41,6 +49,7 @@ type BooqableLine = {
 }
 
 const PICKED_STORAGE_KEY = "orderPickingPicked"
+const CUSTOM_RULE_PICKED_PREFIX = "customRule"
 
 type ItemPhotoMapEntry = {
   item_id: string
@@ -157,6 +166,11 @@ export default function OrderPickingPage() {
   const [combineAll, setCombineAll] = useState(false)
   const [combineSameDays, setCombineSameDays] = useState(false)
   const [showImages, setShowImages] = useState(false)
+  const [customRules, setCustomRules] = useState<OrderPickingCustomItemRule[]>(() => getOrderPickingCustomItemRules())
+  const [customRulesDialogOpen, setCustomRulesDialogOpen] = useState(false)
+  const [newRuleMatchText, setNewRuleMatchText] = useState("")
+  const [newRuleAddItemName, setNewRuleAddItemName] = useState("")
+  const [newRuleAddQuantity, setNewRuleAddQuantity] = useState("1")
   const [itemPhotosMap, setItemPhotosMap] = useState<ItemPhotoMap | null>(null)
   const [imageBuildProgress, setImageBuildProgress] = useState(0)
   const [imageBuildText, setImageBuildText] = useState("")
@@ -186,6 +200,32 @@ export default function OrderPickingPage() {
       // ignore
     }
   }, [pickedKeys])
+
+  useEffect(() => {
+    saveOrderPickingCustomItemRules(customRules)
+  }, [customRules])
+
+  const addNewRule = () => {
+    const matchText = newRuleMatchText.trim()
+    const addItemName = newRuleAddItemName.trim()
+    const qty = Number.parseInt(newRuleAddQuantity, 10)
+    const addQuantity = Number.isFinite(qty) && qty > 0 ? qty : 1
+
+    if (!matchText || !addItemName) return
+
+    const rule: OrderPickingCustomItemRule = normalizeRuleInput({
+      id: `user:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`,
+      enabled: true,
+      matchText,
+      addItemName,
+      addQuantity,
+    })
+
+    setCustomRules((prev) => [...prev, rule])
+    setNewRuleMatchText("")
+    setNewRuleAddItemName("")
+    setNewRuleAddQuantity("1")
+  }
 
   const applyCurrentFilter = useCallback(
     (sourceOrders: BooqableOrder[]) => {
@@ -218,6 +258,28 @@ export default function OrderPickingPage() {
           })
           .filter((i) => i.quantity > 0)
 
+        const enabledRules = customRules.filter((r) => r.enabled)
+        if (enabledRules.length > 0) {
+          const itemNames = items.map((i) => i.name)
+          for (const rule of enabledRules) {
+            if (!orderMatchesRule(itemNames, rule)) continue
+            const injectedId = `${CUSTOM_RULE_PICKED_PREFIX}${rule.id}`
+            const pickedKey = `${o.id}:${injectedId}`
+            const already = items.find((i) => i.id === injectedId)
+            if (already) {
+              already.quantity += rule.addQuantity
+              continue
+            }
+            items.push({
+              id: injectedId,
+              name: rule.addItemName,
+              quantity: rule.addQuantity,
+              booqableItemId: undefined,
+              picked: pickedKeysRef.current.has(pickedKey),
+            })
+          }
+        }
+
         if (items.length === 0) {
           const fallbackQty =
             typeof o.item_count === "number" && Number.isFinite(o.item_count) && o.item_count > 0 ? o.item_count : 1
@@ -241,7 +303,7 @@ export default function OrderPickingPage() {
 
       setOrders(uiOrders)
     },
-    [endDate, startDate],
+    [customRules, endDate, startDate],
   )
 
   useEffect(() => {
@@ -641,14 +703,122 @@ export default function OrderPickingPage() {
                 Apply Filter
               </Button>
               <div className="ml-auto">
-                <Button
-                  onClick={() => setShowImagePanel(!showImagePanel)}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                >
-                  {showImagePanel ? "Hide" : "Show"} Product Images
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Dialog open={customRulesDialogOpen} onOpenChange={setCustomRulesDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="text-xs">
+                        Custom item rules
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="w-[96vw] max-w-4xl max-h-[85vh] overflow-y-auto p-6 sm:p-8">
+                      <DialogHeader>
+                        <DialogTitle>Custom item rules</DialogTitle>
+                        <DialogDescription>
+                          Automatically add custom picking items when an order contains a matching product name.
+                        </DialogDescription>
+                      </DialogHeader>
+ 
+                      <div className="space-y-6">
+                        <div className="rounded-lg border border-border bg-muted/20 p-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <Label>Match text</Label>
+                              <Input
+                                value={newRuleMatchText}
+                                onChange={(e) => setNewRuleMatchText(e.target.value)}
+                                placeholder='e.g. "arch"'
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Add item</Label>
+                              <Input
+                                value={newRuleAddItemName}
+                                onChange={(e) => setNewRuleAddItemName(e.target.value)}
+                                placeholder='e.g. "Sandbags"'
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Qty</Label>
+                              <Input
+                                value={newRuleAddQuantity}
+                                onChange={(e) => setNewRuleAddQuantity(e.target.value)}
+                                inputMode="numeric"
+                                placeholder="1"
+                              />
+                            </div>
+                          </div>
+                          <div className="pt-4">
+                            <Button
+                              onClick={addNewRule}
+                              disabled={!newRuleMatchText.trim() || !newRuleAddItemName.trim()}
+                              className="bg-pastel-blue hover:bg-pastel-blue/80 text-foreground"
+                            >
+                              Add rule
+                            </Button>
+                          </div>
+                        </div>
+ 
+                        <div className="border-t border-border pt-4">
+                          <div className="text-sm font-medium text-foreground">Your custom rules</div>
+                          <div className="text-xs text-muted-foreground pt-1">Enable or disable rules to control what gets auto-added.</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {customRules.length === 0 ? (
+                            <div className="text-sm text-muted-foreground">No rules yet.</div>
+                          ) : (
+                            customRules.map((rule) => (
+                              <div
+                                key={rule.id}
+                                className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-border p-3"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={rule.enabled}
+                                    onCheckedChange={(checked) =>
+                                      setCustomRules((prev) =>
+                                        prev.map((r) => (r.id === rule.id ? { ...r, enabled: checked } : r)),
+                                      )
+                                    }
+                                  />
+                                  <div className="text-sm">
+                                    <span className="font-medium">If</span> name contains{" "}
+                                    <span className="font-mono">{rule.matchText}</span>, add{" "}
+                                    <span className="font-medium">{rule.addItemName}</span> x{rule.addQuantity}
+                                  </div>
+                                </div>
+                                <div className="sm:ml-auto flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setCustomRules((prev) => prev.filter((r) => r.id !== rule.id))}
+                                    className="text-destructive"
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+ 
+                      <DialogFooter>
+                        <Button variant="secondary" onClick={() => setCustomRulesDialogOpen(false)}>
+                          Done
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    onClick={() => setShowImagePanel(!showImagePanel)}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    {showImagePanel ? "Hide" : "Show"} Product Images
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
