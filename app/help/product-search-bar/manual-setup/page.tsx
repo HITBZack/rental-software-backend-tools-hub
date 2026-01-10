@@ -1303,6 +1303,36 @@ document.head.appendChild(fuseScript);`}</code>
                       </Card>
 
                       <div className="p-4 rounded-lg bg-muted/40 border">
+                        <h5 className="font-medium text-sm mb-2">File Location Details</h5>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          The <code>products_with_tags.json</code> file must be uploaded to your WordPress uploads folder:
+                        </p>
+                        <div className="bg-background p-3 rounded border font-mono text-xs mb-3">
+                          /wp-content/uploads/products_with_tags.json
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          This is the same location where WordPress stores your media files (images, documents, etc.).
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-lg bg-muted/40 border">
+                        <h5 className="font-medium text-sm mb-2">Visual Guide</h5>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Here's what the file structure looks like in cPanel:
+                        </p>
+                        <Image
+                          src="/images/help/Product-with-tags-save-location.png"
+                          alt="cPanel file system showing wp-content/uploads folder location"
+                          width={600}
+                          height={400}
+                          className="rounded border"
+                        />
+                        <p className="text-sm text-muted-foreground mt-3">
+                          Need help? Contact our support team at <a href="mailto:contact@halfinthebox.com" className="text-blue-600 hover:text-blue-800">contact@halfinthebox.com</a>
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-lg bg-muted/40 border">
                         <h5 className="font-medium text-sm mb-2">Using WordPress Media Library</h5>
                         <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                           <li>Go to Media → Add New</li>
