@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -485,7 +486,7 @@ export default function ProductSearchBarPage() {
                     </li>
                     <li className="text-muted-foreground">
                       <span className="text-foreground font-medium">Add the search bar widget</span> to your site using
-                      our WordPress plugin or custom code
+                      our WordPress plugin or <Link href="/help/product-search-bar/manual-setup" className="text-pastel-mint hover:text-pastel-mint/80 underline">custom code</Link>
                     </li>
                     <li className="text-muted-foreground">
                       <span className="text-foreground font-medium">Re-generate</span> this file whenever you add new

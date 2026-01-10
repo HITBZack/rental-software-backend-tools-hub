@@ -846,3 +846,73 @@ export function PlusIcon({ className }: { className?: string }) {
     </svg>
   )
 }
+
+// Help system icons
+export function BookOpenIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </svg>
+  )
+}
+
+export function WrenchIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  )
+}
+
+export function CSSIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M4.192 3.582h15.615l-1.424 16.025-6.384 1.777-6.381-1.777-1.426-16.025zm5.725 6.547l.188-2.113h5.99l.188-2.137h-10.5l.564 6.39h6.885l-.244 2.7h-2.221l-.214-2.4h-2.288l.424 4.8h7.8l.564-6.4h-4.836z"/>
+    </svg>
+  )
+}
+
+export function HTMLIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M4.038 3.582h15.925l-1.424 16.025-6.538 1.777-6.538-1.777-1.425-16.025zm5.725 6.547l.188-2.113h6.088l.188-2.137h-10.5l.564 6.39h6.885l-.244 2.7h-2.221l-.214-2.4h-2.288l.424 4.8h7.8l.564-6.4h-4.836z"/>
+    </svg>
+  )
+}
+
+export function JavaScriptIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M0 0h24v24H0V0zm22.034 18.276c-.175-1.095-.888-2.015-3.003-2.873-.736-.345-1.554-.585-1.797-1.14-.091-.33-.105-.51-.046-.705.15-.646.915-.84 1.515-.66.39.12.75.42.976.9 1.034-.676 1.034-.676 1.755-1.125-.27-.42-.404-.601-.586-.78-.63-.705-1.469-1.065-2.834-1.034-.666.03-1.289.105-1.861.39-.27.12-.525.255-.78.405-.105.075-.181.165-.255.24-.39.405-.585.9-.585 1.5.03.945.465 1.47 1.035 1.86.735.495 1.71.705 2.55 1.095.345.12.645.255.87.45.255.21.345.495.3.885-.045.645-.585.945-1.26.945-.735-.045-1.155-.345-1.56-.945l-1.62.945c.21.48.45.69.81 1.034 1.065.9 2.865 1.095 4.246.615.105-.045.225-.09.315-.135.735-.345 1.26-.81 1.515-1.545.09-.27.135-.57.105-.9.015-.645-.195-1.005-.585-1.47zm-7.614-7.965h-1.98c0 1.905-.015 3.795-.015 5.7 0 1.2.075 2.295-.15 2.625-.33.69-1.2.6-1.59.48-.405-.18-.585-.42-.795-.915-.06-.15-.105-.255-.12-.255l-1.635.945c.27.6.66 1.095 1.155 1.44.735.495 1.71.645 2.745.405.67-.165 1.245-.51 1.575-1.065.435-.69.345-1.5.345-2.61.015-2.055 0-4.105 0-6.165z"/>
+    </svg>
+  )
+}
