@@ -48,7 +48,12 @@ export type OrdersDataState = {
   lastFetched: string | null
   progress: number
   progressText: string
-  refreshOrders: () => Promise<void>
+  refreshOrders: (options?: RefreshOrdersOptions) => Promise<void>
+}
+
+export type RefreshOrdersOptions = {
+  enrichStartDate?: string
+  enrichEndDate?: string
 }
 
 export function useOrdersData(): OrdersDataState {
@@ -61,7 +66,7 @@ export function useOrdersData(): OrdersDataState {
   const [progressText, setProgressText] = useState("")
 
   const loadOrders = useCallback(
-    async (forceRefresh: boolean) => {
+    async (forceRefresh: boolean, options?: RefreshOrdersOptions) => {
       setError(null)
       setProgress(0)
       setProgressText("")
@@ -77,6 +82,10 @@ export function useOrdersData(): OrdersDataState {
 
       setIsLoading(true)
       try {
+        if (forceRefresh) {
+          setOrders([])
+        }
+
         let ordersList: BooqableOrder[] | null = null
 
         if (!forceRefresh) {
@@ -104,17 +113,33 @@ export function useOrdersData(): OrdersDataState {
           oneMonthAgo.setMonth(today.getMonth() - 1)
           const oneMonthAhead = new Date(today)
           oneMonthAhead.setMonth(today.getMonth() + 1)
+
+          const enrichStart = options?.enrichStartDate ? new Date(`${options.enrichStartDate}T00:00:00`) : null
+          const enrichEnd = options?.enrichEndDate ? new Date(`${options.enrichEndDate}T23:59:59`) : null
+          const hasValidEnrichWindow =
+            enrichStart instanceof Date &&
+            enrichEnd instanceof Date &&
+            Number.isFinite(enrichStart.getTime()) &&
+            Number.isFinite(enrichEnd.getTime()) &&
+            enrichStart.getTime() <= enrichEnd.getTime()
           
           const ordersNeedingEnrichment = ordersList.filter((order) => {
-            const hasLines = Array.isArray(order.lines) && order.lines.length > 0
+            const hasLines =
+              (Array.isArray(order.lines) && order.lines.length > 0) ||
+              (Array.isArray(order.order_lines) && (order.order_lines as BooqableLine[]).length > 0)
             if (hasLines || !order.id) return false
             
-            // Only enrich orders within ±1 month of today
             if (order.starts_at) {
               const orderDate = new Date(order.starts_at)
-              if (orderDate < oneMonthAgo || orderDate > oneMonthAhead) {
-                return false
+              if (Number.isNaN(orderDate.getTime())) return false
+
+              // If we have a caller-provided window, use it
+              if (hasValidEnrichWindow) {
+                return orderDate >= (enrichStart as Date) && orderDate <= (enrichEnd as Date)
               }
+
+              // Otherwise default to ±1 month around today
+              if (orderDate < oneMonthAgo || orderDate > oneMonthAhead) return false
             }
             
             return true
@@ -213,9 +238,12 @@ export function useOrdersData(): OrdersDataState {
     [settings],
   )
 
-  const refreshOrders = useCallback(async () => {
-    await loadOrders(true)
-  }, [loadOrders])
+  const refreshOrders = useCallback(
+    async (options?: RefreshOrdersOptions) => {
+      await loadOrders(true, options)
+    },
+    [loadOrders],
+  )
 
   useEffect(() => {
     if (!settings?.businessSlug) return

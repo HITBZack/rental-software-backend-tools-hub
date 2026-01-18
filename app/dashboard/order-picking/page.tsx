@@ -49,7 +49,7 @@ type BooqableLine = {
 }
 
 const PICKED_STORAGE_KEY = "orderPickingPicked"
-const CUSTOM_RULE_PICKED_PREFIX = "customRule"
+const CUSTOM_RULE_PICKED_PREFIX = "customRule:"
 
 type ItemPhotoMapEntry = {
   item_id: string
@@ -343,7 +343,7 @@ export default function OrderPickingPage() {
   }, [])
 
   const handleRefresh = async () => {
-    await refreshOrders()
+    await refreshOrders({ enrichStartDate: startDate, enrichEndDate: endDate })
   }
 
   const handleApplyFilter = () => {
