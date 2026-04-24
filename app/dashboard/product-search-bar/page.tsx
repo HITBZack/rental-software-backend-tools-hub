@@ -1,6 +1,6 @@
-"use client"
+﻿"use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,8 +20,8 @@ import {
   CloudUploadIcon,
   ShieldIcon,
 } from "@/components/icons"
-import { getAllPaginated } from "@/lib/api"
 import { getSettings, saveSettings } from "@/lib/storage"
+import { parseCsv, mapCsvToProducts } from "@/lib/csv-products"
 
 interface Product {
   name: string
@@ -39,19 +39,20 @@ interface ProductWithTags extends Product {
 // Default stopwords for tag generation
 const DEFAULT_STOPWORDS = `the, a, an, is, this, that, by, with, only, ft, item, items, setup, setups, diameter, width, height, length, size, sizes, color, colors, style, styles, type, types, model, models, brand, brands, make, br, p, x, and, or, of, on, in, for, to, as, l, m, s, xl, xxl, xxxl, xxs, xs, i, it, if, perfect, new, used, like, more, less, than, about, all, some, any, every, such, no, not, per, pers, we, you, up, dimensions, dimension, dimensionses, delivery, deliveries, rentals, rental, rents, rent, available, availables, availablity, availablities, service, services, pickup, pickups, pick-up, setups, setup, setupes, setuping, product, products, w, butt, but, butts, item, items, itemes, iteming, itemses, itemsing, has, have, had, having, say, hold, holds, holding, holded, holdes, holdings, use, uses, using, used, useing, usees, usings, make, makes, making, mades, mading, madeing, madees, madeses, do, does, doing, did, done, doeses, doings, doed, doesing, go, nbsp, nbsps, included, includes, including, include, includedes, includings, includeds, organically, organicallies, organic, organics, organicses, organicing, organices, organicinges, and/or, andor, andors, andorses, andoring, andored, andores, or/and, orand, orands, orandses, oranding, oranded, orandes, really, realies, reals, realses, realing, realed, reales, reallies, people, peoples, person, persons, peopleing, peoplees, peopleinges, personing, persones, personinges, personings, personingses, personinges, thing, things, thinges, thinging, thingesing, thingesed, thingeses, likes, liking, liked, likeses, likings, likingses, etc, etcs, etcetera, etceteras, timeless, events, timelesses, ltd, oz, ozs, ozes, ozing, ozed, ozesing, be, tool, tools`
 
-type Step = "intro" | "fetching" | "tagging" | "complete"
+type Step = "intro" | "parsing" | "tagging" | "complete"
 
 export default function ProductSearchBarPage() {
   const [step, setStep] = useState<Step>("intro")
   const [products, setProducts] = useState<Product[]>([])
   const [productsWithTags, setProductsWithTags] = useState<ProductWithTags[]>([])
-  const [fetchProgress, setFetchProgress] = useState(0)
-  const [fetchedCount, setFetchedCount] = useState(0)
-  const [totalCount, setTotalCount] = useState<number | null>(null)
   const [tagProgress, setTagProgress] = useState(0)
   const [stopwords, setStopwords] = useState(DEFAULT_STOPWORDS)
   const [error, setError] = useState<string | null>(null)
-  const [currentPage, setCurrentPage] = useState(0)
+  const [csvFileName, setCsvFileName] = useState<string | null>(null)
+  const [skippedShipping, setSkippedShipping] = useState(0)
+  const [skippedInvalid, setSkippedInvalid] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const settings = getSettings()
@@ -120,70 +121,89 @@ export default function ProductSearchBarPage() {
     [stopwords],
   )
 
-  // Fetch all products
-  const fetchProducts = async () => {
+  // Parse a selected CSV file and map it to Product[]
+  const ingestCsvFile = async (file: File) => {
     setError(null)
-    setStep("fetching")
-    setFetchProgress(0)
-    setFetchedCount(0)
-    setTotalCount(null)
+    setStep("parsing")
+    setCsvFileName(file.name)
     setProducts([])
-
-    const settings = getSettings()
-    const apiKey = settings.apiKey
-    const businessSlug = settings.businessSlug
-
-    if (!apiKey || !businessSlug) {
-      setError("Missing Booqable connection details. Please complete onboarding first.")
-      setStep("intro")
-      return
-    }
+    setProductsWithTags([])
+    setSkippedShipping(0)
+    setSkippedInvalid(0)
 
     try {
-      const rawProducts = await getAllPaginated<any>("products", {
-        pageSize: 100,
-        sleepDelay: 500,
-        paginationMode: "legacy",
-        onProgress: (fetched, total) => {
-          setFetchedCount(fetched)
-          if (total && !totalCount) setTotalCount(total)
-          setFetchProgress(total ? Math.round((fetched / total) * 100) : 0)
-          setCurrentPage(Math.max(1, Math.ceil(fetched / 100)))
-        },
+      const text = await file.text()
+      const parsed = parseCsv(text)
+
+      if (parsed.headers.length === 0 || parsed.rows.length === 0) {
+        setError("That CSV is empty or could not be parsed. Please check the file and try again.")
+        setStep("intro")
+        return
+      }
+
+      const { businessSlug } = getSettings()
+      const { products: mapped, skipped, missingColumns } = mapCsvToProducts(parsed, {
+        businessSlug,
+        includeCollectionsAsTags: true,
+        excludeShippingNames: true,
       })
 
-      const mapped: Product[] = []
-      for (const p of rawProducts) {
-        const nameValue = (p?.name ?? p?.attributes?.name ?? "") as string
-        const name = nameValue.toLowerCase()
-        if (name.includes("delivery") || name.includes("pick up")) continue
+      if (missingColumns.length > 0) {
+        setError(
+          `CSV is missing required column(s): ${missingColumns.join(", ")}. ` +
+            "Export your products from Booqable and try again.",
+        )
+        setStep("intro")
+        return
+      }
 
-        const id = (p?.id ?? p?.attributes?.id) as string
-        const slug = (p?.slug ?? p?.attributes?.slug) as string | undefined
-        const photoUrl = (p?.photo_url ?? p?.attributes?.photo_url) as string | null | undefined
-        const tagList = (p?.tag_list ?? p?.attributes?.tag_list) as string[] | undefined
-        const description = (p?.description ?? p?.attributes?.description) as string | null | undefined
-
-        if (!id || !nameValue) continue
-
-        mapped.push({
-          name: nameValue,
-          id,
-          url: `https://${businessSlug}.booqable.com/rentals/${slug || id}`,
-          image: photoUrl || null,
-          tags: tagList || [],
-          description: description || null,
-        })
+      if (mapped.length === 0) {
+        setError("No valid products were found in that CSV.")
+        setStep("intro")
+        return
       }
 
       setProducts(mapped)
-      setFetchedCount(mapped.length)
-      setFetchProgress(100)
-      setTimeout(() => generateTagsForProducts(mapped), 500)
+      setSkippedShipping(skipped.shipping)
+      setSkippedInvalid(skipped.missingIdOrName)
+      setTimeout(() => generateTagsForProducts(mapped), 250)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch products")
+      setError(err instanceof Error ? err.message : "Failed to read CSV file")
       setStep("intro")
     }
+  }
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) void ingestCsvFile(file)
+    // Reset so selecting the same file again re-triggers onChange
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    const name = file.name.toLowerCase()
+    if (!name.endsWith(".csv")) {
+      setError("Please drop a .csv file exported from Booqable.")
+      return
+    }
+    void ingestCsvFile(file)
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
   }
 
   // Generate tags for all products
@@ -232,9 +252,11 @@ export default function ProductSearchBarPage() {
     setStep("intro")
     setProducts([])
     setProductsWithTags([])
-    setFetchProgress(0)
     setTagProgress(0)
     setError(null)
+    setCsvFileName(null)
+    setSkippedShipping(0)
+    setSkippedInvalid(0)
   }
 
   return (
@@ -362,47 +384,82 @@ export default function ProductSearchBarPage() {
                 </div>
               )}
 
-              <Button onClick={fetchProducts} className="w-full h-12 text-base">
-                <RefreshIcon className="h-5 w-5 mr-2" />
-                Generate Product Search Data
-              </Button>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CloudUploadIcon className="h-5 w-5" />
+                    Upload Products CSV
+                  </CardTitle>
+                  <CardDescription>
+                    Export your products from Booqable (Products &rarr; Export) and drop the CSV here. No API calls are
+                    made &mdash; everything is processed locally in your browser.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        fileInputRef.current?.click()
+                      }
+                    }}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 cursor-pointer transition-colors ${
+                      isDragging
+                        ? "border-pastel-mint bg-pastel-mint/20"
+                        : "border-border bg-muted/30 hover:bg-muted/50"
+                    }`}
+                  >
+                    <CloudUploadIcon className="h-8 w-8 text-foreground" />
+                    <p className="text-sm font-medium">
+                      {isDragging ? "Drop CSV to start" : "Click to choose a CSV, or drag & drop it here"}
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center max-w-md">
+                      Expected columns include <code className="font-mono">id</code>,{" "}
+                      <code className="font-mono">name</code>, <code className="font-mono">description</code>,{" "}
+                      <code className="font-mono">tags</code>, <code className="font-mono">collections</code>,{" "}
+                      <code className="font-mono">photo_1_url_main</code>. Example files live in{" "}
+                      <code className="font-mono">product-exports/</code>.
+                    </p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={handleFileInputChange}
+                      className="hidden"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
-          {/* Fetching Step */}
-          {step === "fetching" && (
+          {/* Parsing Step */}
+          {step === "parsing" && (
             <Card className="animate-fade-in">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <RefreshIcon className="h-5 w-5 animate-spin" />
-                  Fetching Your Products
+                  Parsing {csvFileName ?? "CSV"}
                 </CardTitle>
                 <CardDescription>
-                  Reading product data from your Booqable account. This may take a moment for large inventories.
+                  Reading your CSV locally and mapping it to the product search format. Nothing is uploaded anywhere.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium">
-                      {fetchedCount} {totalCount ? `/ ${totalCount}` : ""} products
-                    </span>
-                  </div>
-                  <Progress value={fetchProgress} className="h-3" />
-                  <p className="text-xs text-muted-foreground text-center">
-                    Fetching page {currentPage}... (Read-only, no changes are made)
-                  </p>
-                </div>
-
+                <Progress value={null as unknown as number} className="h-3" />
                 <div className="p-4 rounded-lg bg-pastel-lavender/20 border border-pastel-lavender/30">
                   <div className="flex items-center gap-2 mb-2">
                     <ShieldIcon className="h-4 w-4 text-foreground" />
-                    <span className="text-sm font-medium">Safe & Secure</span>
+                    <span className="text-sm font-medium">Local-only processing</span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    We are only reading your product data. No data is being written or modified in your Booqable
-                    account.
+                    Your CSV stays on this device. No requests are made to Booqable or any external server.
                   </p>
                 </div>
               </CardContent>
@@ -460,6 +517,26 @@ export default function ProductSearchBarPage() {
                       <p className="text-sm text-muted-foreground">Total search tags</p>
                     </div>
                   </div>
+
+                  {(skippedShipping > 0 || skippedInvalid > 0 || csvFileName) && (
+                    <div className="p-3 rounded-lg bg-white border text-xs text-muted-foreground space-y-1">
+                      {csvFileName && (
+                        <div>
+                          Source file: <code className="font-mono text-foreground">{csvFileName}</code>
+                        </div>
+                      )}
+                      {skippedShipping > 0 && (
+                        <div>
+                          Skipped {skippedShipping} shipping/pickup rows
+                        </div>
+                      )}
+                      {skippedInvalid > 0 && (
+                        <div>
+                          Skipped {skippedInvalid} rows missing an id or name
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <Button onClick={downloadJson} className="w-full h-12">
                     <DownloadIcon className="h-5 w-5 mr-2" />
